@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bala Plumb Tech | Login</title>
+    <link rel="stylesheet" href="./css/main.css" />
+    <link rel="stylesheet" href="./css/auth.css" />
+    <link rel="stylesheet" href="./css/responsive.css" />
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script type="module" src="./js/auth/login.js"></script>
+  </head>
+  <body class="auth-page">
+    <div class="auth-shell">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">BPT</div>
+          <div>
+            <h1>Bala Plumb Tech</h1>
+            <p>Commercial Plumbing Inventory Management</p>
+          </div>
+        </div>
+
+        <form id="loginForm" class="auth-form" novalidate>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required />
+          </div>
+
+          <div class="form-group password-row">
+            <label for="password">Password</label>
+            <button type="button" id="togglePassword" class="text-button" aria-label="Toggle password visibility">Show</button>
+          </div>
+          <div class="form-group">
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </div>
+
+          <button id="loginButton" type="submit" class="btn btn-primary btn-block">
+            <span class="button-text">Login</span>
+            <span class="spinner hidden" aria-hidden="true"></span>
+          </button>
+
+          <div class="auth-divider"><span>or</span></div>
+
+          <button id="googleLoginButton" type="button" class="btn btn-google btn-block">
+            Continue with Google
+          </button>
+
+          <p id="loginError" class="form-error hidden" role="alert"></p>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+@media (max-width: 640px) {
+  .page-content {
+    padding: 18px 14px 40px;
+  }
+
+  .topbar {
+    padding: 14px 16px;
+  }
+
+  .topbar-right {
+    gap: 8px;
+  }
+
+  .profile-chip {
+    padding: 4px 8px;
+  }
+
+  .profile-chip span:last-child {
+    display: none;
+  }
+
+  .table-wrap {
+    margin: 0 -8px;
+  }
+
+  .data-table {
+    min-width: 620px;
+  }
+
+  .auth-card {
+    padding: 20px 18px;
+  }
+
+  .modal {
+    align-items: flex-start;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-height: calc(100vh - 20px);
+    border-radius: 16px;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .modal-form-body {
+    max-height: calc(100vh - 145px);
+  }
+
+  .modal .form-actions {
+    position: sticky;
+    bottom: -16px;
+    padding: 12px 0 4px;
+    background: #fff;
+  }
+}

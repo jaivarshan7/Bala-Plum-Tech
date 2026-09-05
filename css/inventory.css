@@ -1,0 +1,93 @@
+.with-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.status-pill.in-stock {
+  background: rgba(22,163,74,0.12);
+  color: var(--success);
+}
+
+.status-pill.low-stock {
+  background: rgba(245,158,11,0.12);
+  color: var(--warning);
+}
+
+.status-pill.out-of-stock {
+  background: rgba(220,38,38,0.12);
+  color: var(--danger);
+}
+
+.item-image-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 22px;
+}
+
+.item-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.item-image-large {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+}
+
+.detail-meta {
+  display: grid;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.empty-box {
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}

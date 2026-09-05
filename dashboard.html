@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bala Plumb Tech | Dashboard</title>
+    <link rel="stylesheet" href="./css/main.css" />
+    <link rel="stylesheet" href="./css/dashboard.css" />
+    <link rel="stylesheet" href="./css/forms.css" />
+    <link rel="stylesheet" href="./css/responsive.css" />
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script type="module" src="./js/pages/dashboard.js"></script>
+  </head>
+  <body>
+    <div id="appShell" class="app-shell">
+      <aside id="sidebar" class="sidebar"></aside>
+      <div class="main-panel">
+        <header id="topbar" class="topbar"></header>
+        <main class="page-content">
+          <div class="page-header">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h1>Dashboard</h1>
+            </div>
+          </div>
+
+          <section class="stats-grid">
+            <article class="stat-card">
+              <div class="stat-icon success"><span>📦</span></div>
+              <div>
+                <p>Total Inventory Items</p>
+                <h2 id="totalItems">0</h2>
+              </div>
+            </article>
+
+            <article class="stat-card">
+              <div class="stat-icon primary"><span>📊</span></div>
+              <div>
+                <p>Total Quantity</p>
+                <h2 id="totalQuantity">0</h2>
+              </div>
+            </article>
+
+            <article class="stat-card">
+              <div class="stat-icon warning"><span>⚠️</span></div>
+              <div>
+                <p>Low Stock Items</p>
+                <h2 id="lowStockCount">0</h2>
+              </div>
+            </article>
+
+            <article class="stat-card">
+              <div class="stat-icon info"><span>📜</span></div>
+              <div>
+                <p>Recent Transactions</p>
+                <h2 id="recentTransactionsCount">0</h2>
+              </div>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Recent Activity</h2>
+              </div>
+              <div id="activityFeed" class="activity-feed"></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Low Stock Alerts</h2>
+              </div>
+              <div id="lowStockSummary" class="stack-list"></div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <script type="module" src="./js/components/sidebar.js"></script>
+    <script type="module" src="./js/components/navbar.js"></script>
+  </body>
+</html>

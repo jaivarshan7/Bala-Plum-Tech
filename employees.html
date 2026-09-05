@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bala Plumb Tech | Employees</title>
+    <link rel="stylesheet" href="./css/main.css" />
+    <link rel="stylesheet" href="./css/inventory.css" />
+    <link rel="stylesheet" href="./css/forms.css" />
+    <link rel="stylesheet" href="./css/responsive.css" />
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script type="module" src="./js/pages/employees.js"></script>
+  </head>
+  <body>
+    <div id="appShell" class="app-shell">
+      <aside id="sidebar" class="sidebar"></aside>
+      <div class="main-panel">
+        <header id="topbar" class="topbar"></header>
+        <main class="page-content">
+          <div class="page-header">
+            <div>
+              <p class="eyebrow">Team</p>
+              <h1>Employee Management</h1>
+            </div>
+            <button id="addEmployeeButton" class="btn btn-primary">+ Add Employee</button>
+          </div>
+          <section class="panel">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Account Status</th>
+                    <th>Created</th>
+                    <th>Last Activity</th>
+                  </tr>
+                </thead>
+                <tbody id="employeesTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="employeeModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Add Employee</h2>
+          <button class="close-button" data-close-modal="employeeModal" type="button">×</button>
+        </div>
+        <form id="employeeForm" class="stack-form">
+          <div class="form-grid two-col">
+            <div class="form-group"><label for="employeeName">Full Name</label><input id="employeeName" name="fullName" required /></div>
+            <div class="form-group"><label for="employeeEmail">Email</label><input id="employeeEmail" name="email" type="email" required /></div>
+            <div class="form-group"><label for="employeePassword">Temporary Password</label><input id="employeePassword" name="password" type="password" minlength="6" required /></div>
+            <div class="form-group"><label for="employeeRole">Role</label><select id="employeeRole" name="role"><option value="EMPLOYEE">Employee</option><option value="OWNER">Owner</option></select></div>
+          </div>
+          <p id="employeeFormMessage" class="form-error hidden" role="alert"></p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" data-close-modal="employeeModal">Cancel</button>
+            <button id="saveEmployeeButton" type="submit" class="btn btn-primary">Create Account</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="./js/components/sidebar.js"></script>
+    <script type="module" src="./js/components/navbar.js"></script>
+  </body>
+</html>
