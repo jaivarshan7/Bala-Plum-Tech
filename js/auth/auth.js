@@ -1,12 +1,20 @@
 import { getFirebaseServices } from '../firebase/firebase-config.js';
+import { clearUserProfileCache } from '../services/user-service.js';
 
-const { auth, db } = getFirebaseServices();
+function getAuth() {
+  return getFirebaseServices().auth;
+}
+
+function getDb() {
+  return getFirebaseServices().db;
+}
 
 export function getCurrentUser() {
-  return auth?.currentUser || null;
+  return getAuth()?.currentUser || null;
 }
 
 export async function signInWithEmail(email, password) {
+  const auth = getAuth();
   if (!auth) {
     throw new Error('Firebase is not configured yet. Update js/firebase/firebase-config.js with your project settings.');
   }
@@ -14,6 +22,7 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signInWithGoogle() {
+  const auth = getAuth();
   if (!auth) {
     throw new Error('Firebase is not configured yet. Update js/firebase/firebase-config.js with your project settings.');
   }
@@ -25,6 +34,7 @@ export async function signInWithGoogle() {
 }
 
 async function ensureUserProfile(user) {
+  const db = getDb();
   if (!db || !user) return;
 
   const profileRef = db.collection('users').doc(user.uid);
@@ -45,11 +55,22 @@ async function ensureUserProfile(user) {
 }
 
 export async function signOutUser() {
-  return auth?.signOut();
+  clearUserProfileCache();
+  return getAuth()?.signOut();
 }
 
 export function onAuthStateChanged(callback) {
+  const auth = getAuth();
   if (!auth) {
+    // If not initialized yet, wait for DOMContentLoaded / defer scripts
+    if (document.readyState === 'loading') {
+      let unsubscribe = () => {};
+      window.addEventListener('DOMContentLoaded', () => {
+        const deferredAuth = getAuth();
+        if (deferredAuth) unsubscribe = deferredAuth.onAuthStateChanged(callback);
+      }, { once: true });
+      return () => unsubscribe();
+    }
     return () => {};
   }
   return auth.onAuthStateChanged(callback);

@@ -30,10 +30,23 @@ export function initializeFirebase() {
   const firebaseApp = window.firebase.app();
   const firebaseAuth = window.firebase.auth();
   const firestore = window.firebase.firestore();
+
+  if (!window.__plumbtrackPersistenceInitialized && firestore?.enablePersistence) {
+    window.__plumbtrackPersistenceInitialized = true;
+    firestore.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+      // Multiple tabs open or private browsing mode - silently fall back to normal mode
+      if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+        console.warn('Firestore offline persistence notice:', err.message);
+      }
+    });
+  }
+
   Object.assign(window, {
     __plumbtrackApp: firebaseApp,
     __plumbtrackAuth: firebaseAuth,
-    __plumbtrackDb: firestore
+    __plumbtrackDb: firestore,
+    db: firestore,
+    auth: firebaseAuth
   });
 
   return {

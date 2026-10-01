@@ -158,12 +158,49 @@ function getStock(item) {
   return Number(item.stock ?? item.quantity ?? 0);
 }
 
+function renderTableSkeletons() {
+  inventoryTableBody.innerHTML = Array.from({ length: 6 }).map(() => `
+    <tr>
+      <td><span class="skeleton skeleton-text" style="width: 140px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 80px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 80px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 70px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 50px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 40px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 40px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 70px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 120px;">&nbsp;</span></td>
+    </tr>
+  `).join('');
+}
+
+function debounce(fn, delay = 150) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
 async function loadInventoryPage(user) {
+  renderTableSkeletons();
   try {
     inventoryData = await getInventoryItems();
   } catch (error) {
     console.error('Unable to load inventory:', error);
     inventoryData = [];
+    inventoryTableBody.innerHTML = `
+      <tr>
+        <td colspan="9">
+          <div class="empty-state">
+            <p>Unable to load inventory. Please check your network connection.</p>
+            <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
+          </div>
+        </td>
+      </tr>
+    `;
+    document.getElementById('retryInventoryBtn')?.addEventListener('click', () => loadInventoryPage(user));
+    return;
   }
 
   renderCategoryOptions();
@@ -172,7 +209,7 @@ async function loadInventoryPage(user) {
   renderInventoryTable();
 }
 
-searchInput.addEventListener('input', renderInventoryTable);
+searchInput.addEventListener('input', debounce(renderInventoryTable, 150));
 categoryFilter.addEventListener('change', renderInventoryTable);
 subcategoryFilter.addEventListener('change', renderInventoryTable);
 brandFilter.addEventListener('change', renderInventoryTable);
@@ -224,6 +261,9 @@ document.querySelectorAll('[data-close-modal]').forEach((button) => {
 inventoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
+  const submitButton = inventoryForm.querySelector('button[type="submit"]');
+  const originalButtonText = submitButton ? submitButton.textContent : 'Save';
+
   const formData = new FormData(inventoryForm);
   const payload = {
     name: String(formData.get('name') || '').trim(),
@@ -248,18 +288,33 @@ inventoryForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  payload.createdBy = getCurrentUser().uid;
-  if (editingItemId) await updateInventoryItem(editingItemId, payload);
-  else await createInventoryItem(payload);
-  inventoryForm.reset();
-  categorySelect?.clear(true);
-  subcategorySelect?.clear(true);
-  brandSelect?.clear(true);
-  editingItemId = null;
-  itemModal.classList.add('hidden');
-  inventoryData = await getInventoryItems();
-  renderFilterOptions();
-  renderInventoryTable();
+  try {
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Saving...';
+    }
+
+    payload.createdBy = getCurrentUser().uid;
+    if (editingItemId) await updateInventoryItem(editingItemId, payload);
+    else await createInventoryItem(payload);
+    inventoryForm.reset();
+    categorySelect?.clear(true);
+    subcategorySelect?.clear(true);
+    brandSelect?.clear(true);
+    editingItemId = null;
+    itemModal.classList.add('hidden');
+    inventoryData = await getInventoryItems(true);
+    renderFilterOptions();
+    renderInventoryTable();
+  } catch (err) {
+    console.error('Error saving inventory item:', err);
+    window.alert(err.message || 'Unable to save item. Please try again.');
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalButtonText;
+    }
+  }
 });
 
 onAuthStateChanged((user) => {

@@ -1,4 +1,5 @@
 import { onAuthStateChanged } from './auth.js';
+import { getCurrentUserProfile } from '../services/user-service.js';
 
 export function initializeRouteGuard({ allowedRoles = [], redirectTo = './login.html' } = {}) {
   return new Promise((resolve) => {
@@ -9,17 +10,23 @@ export function initializeRouteGuard({ allowedRoles = [], redirectTo = './login.
         return;
       }
 
-      const userDoc = await window.db.collection('users').doc(user.uid).get();
-      const role = userDoc.exists ? userDoc.data().role : null;
+      try {
+        const profile = await getCurrentUserProfile(user.uid);
+        const role = profile?.role || null;
 
-      if (allowedRoles.length && !allowedRoles.includes(role)) {
-        window.location.href = './dashboard.html';
-        resolve(false);
-        return;
+        if (allowedRoles.length && !allowedRoles.includes(role)) {
+          window.location.href = './dashboard.html';
+          resolve(false);
+          return;
+        }
+
+        resolve(true);
+      } catch (err) {
+        console.error('Route guard error:', err);
+        resolve(true);
+      } finally {
+        unsubscribe();
       }
-
-      resolve(true);
-      unsubscribe();
     });
   });
 }

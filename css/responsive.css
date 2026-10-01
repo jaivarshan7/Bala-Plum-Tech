@@ -21,14 +21,26 @@
 
   .table-wrap {
     margin: 0 -8px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .data-table {
-    min-width: 620px;
+    min-width: 580px;
   }
 
   .auth-card {
-    padding: 20px 18px;
+    padding: 24px 20px;
+    border-radius: 20px;
+  }
+
+  .toolbar-filters {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .search-wrap, .toolbar select, .toolbar input {
+    width: 100%;
+    min-width: unset;
   }
 
   .modal {
@@ -54,5 +66,24 @@
     bottom: -16px;
     padding: 12px 0 4px;
     background: #fff;
+  }
+}
+
+@media (max-width: 400px) {
+  .page-content {
+    padding: 14px 10px 30px;
+  }
+
+  .topbar {
+    padding: 12px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .auth-shell {
+    width: 100%;
+    padding: 0 8px;
   }
 }

@@ -2,8 +2,11 @@ import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js
 import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getInitials } from '../utils/helpers.js';
 import { getNotificationsForUser, markAllNotificationsAsRead, markNotificationAsRead } from '../services/notification-service.js';
+import { getCurrentUserProfile, clearUserProfileCache } from '../services/user-service.js';
 
 const { db } = getFirebaseServices();
+
+let activeNotifications = [];
 
 export async function renderTopbar() {
   const topbar = document.getElementById('topbar');
@@ -16,19 +19,27 @@ export async function renderTopbar() {
     return;
   }
 
-  const snap = await db.collection('users').doc(user.uid).get();
-  const data = snap.exists ? snap.data() : {};
-  const displayName = data.fullName || user.displayName || 'User';
-  const role = data.role || 'EMPLOYEE';
-  let notifications = [];
+  let displayName = user.displayName || 'User';
+  let role = 'EMPLOYEE';
 
   try {
-    notifications = await getNotificationsForUser(user.uid);
-  } catch (error) {
-    console.error('Unable to load notifications:', error);
+    const profile = await getCurrentUserProfile(user.uid);
+    if (profile) {
+      displayName = profile.fullName || displayName;
+      role = profile.role || role;
+    }
+  } catch (err) {
+    console.error('Unable to fetch user profile for topbar:', err);
   }
 
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
+  try {
+    activeNotifications = await getNotificationsForUser(user.uid);
+  } catch (error) {
+    console.error('Unable to load notifications:', error);
+    activeNotifications = [];
+  }
+
+  const unreadCount = activeNotifications.filter((notification) => !notification.isRead).length;
 
   topbar.innerHTML = `
     <div class="topbar-left">
@@ -46,14 +57,41 @@ export async function renderTopbar() {
     </div>
   `;
 
+  setupTopbarListeners(user, displayName, role, unreadCount);
+}
+
+function setupTopbarListeners(user, displayName, role, unreadCount) {
   const notificationButton = document.getElementById('notificationButton');
-  notificationButton?.addEventListener('click', () => {
+  const profileMenuToggle = document.getElementById('profileMenuToggle');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+
+  // Dismiss any open dropdowns when clicking outside
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const profileDropdown = document.getElementById('profileDropdown');
+
+    if (notificationDropdown && !notificationDropdown.contains(target) && !notificationButton?.contains(target)) {
+      notificationDropdown.remove();
+      notificationButton?.setAttribute('aria-expanded', 'false');
+    }
+
+    if (profileDropdown && !profileDropdown.contains(target) && !profileMenuToggle?.contains(target)) {
+      profileDropdown.remove();
+    }
+  });
+
+  notificationButton?.addEventListener('click', (e) => {
+    e.stopPropagation();
     const existing = document.getElementById('notificationDropdown');
     if (existing) {
       existing.remove();
       notificationButton.setAttribute('aria-expanded', 'false');
       return;
     }
+
+    // Close profile dropdown if open
+    document.getElementById('profileDropdown')?.remove();
 
     const dropdown = document.createElement('div');
     dropdown.id = 'notificationDropdown';
@@ -64,7 +102,7 @@ export async function renderTopbar() {
         ${unreadCount ? '<button id="markAllNotifications" class="text-button">Mark all read</button>' : ''}
       </div>
       <div class="notification-list">
-        ${notifications.length ? notifications.map((notification) => `
+        ${activeNotifications.length ? activeNotifications.map((notification) => `
           <button class="notification-item ${notification.isRead ? '' : 'unread'}" data-notification-id="${notification.id}">
             <strong>${notification.title || 'Notification'}</strong>
             <span>${notification.message || ''}</span>
@@ -84,7 +122,7 @@ export async function renderTopbar() {
       item.addEventListener('click', async () => {
         await markNotificationAsRead(item.dataset.notificationId);
         item.classList.remove('unread');
-        notifications = notifications.map((notification) => notification.id === item.dataset.notificationId
+        activeNotifications = activeNotifications.map((notification) => notification.id === item.dataset.notificationId
           ? { ...notification, isRead: true }
           : notification);
         await renderTopbar();
@@ -92,10 +130,17 @@ export async function renderTopbar() {
     });
   });
 
-  const profileMenuToggle = document.getElementById('profileMenuToggle');
-  profileMenuToggle?.addEventListener('click', () => {
+  profileMenuToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
     const existing = document.getElementById('profileDropdown');
-    if (existing) existing.remove();
+    if (existing) {
+      existing.remove();
+      return;
+    }
+
+    // Close notification dropdown if open
+    document.getElementById('notificationDropdown')?.remove();
+    notificationButton?.setAttribute('aria-expanded', 'false');
 
     const dropdown = document.createElement('div');
     dropdown.id = 'profileDropdown';
@@ -120,15 +165,41 @@ export async function renderTopbar() {
     document.body.appendChild(dropdown);
 
     document.getElementById('logoutButton')?.addEventListener('click', async () => {
+      clearUserProfileCache();
       await signOutUser();
       window.location.href = './login.html';
     });
   });
 
-  const sidebarToggle = document.getElementById('sidebarToggle');
+  // Mobile sidebar toggle with overlay
   sidebarToggle?.addEventListener('click', () => {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar) sidebar.style.display = sidebar.style.display === 'none' ? 'block' : 'none';
+    if (!sidebar) return;
+
+    const isVisible = sidebar.classList.contains('sidebar-open') || sidebar.style.display === 'block';
+
+    if (isVisible) {
+      sidebar.classList.remove('sidebar-open');
+      sidebar.style.display = '';
+      document.getElementById('sidebarBackdrop')?.remove();
+    } else {
+      sidebar.classList.add('sidebar-open');
+      sidebar.style.display = 'block';
+
+      // Add mobile backdrop
+      let backdrop = document.getElementById('sidebarBackdrop');
+      if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'sidebarBackdrop';
+        backdrop.className = 'sidebar-backdrop';
+        backdrop.addEventListener('click', () => {
+          sidebar.classList.remove('sidebar-open');
+          sidebar.style.display = '';
+          backdrop.remove();
+        });
+        document.body.appendChild(backdrop);
+      }
+    }
   });
 }
 

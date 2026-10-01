@@ -3,9 +3,38 @@ import { getFirebaseConfig } from '../firebase/firebase-config.js';
 
 const { db } = getFirebaseServices();
 
-export async function getCurrentUserProfile(userId) {
-  const doc = await db.collection('users').doc(userId).get();
-  return doc.exists ? { id: doc.id, ...doc.data() } : null;
+let cachedUserProfile = null;
+let profileFetchPromise = null;
+
+export async function getCurrentUserProfile(userId, forceRefresh = false) {
+  if (!userId) return null;
+  if (!forceRefresh && cachedUserProfile && (cachedUserProfile.uid === userId || cachedUserProfile.id === userId)) {
+    return cachedUserProfile;
+  }
+  if (!forceRefresh && profileFetchPromise) {
+    return profileFetchPromise;
+  }
+
+  profileFetchPromise = (async () => {
+    try {
+      const doc = await db.collection('users').doc(userId).get();
+      if (doc.exists) {
+        cachedUserProfile = { id: doc.id, ...doc.data() };
+      } else {
+        cachedUserProfile = null;
+      }
+      return cachedUserProfile;
+    } finally {
+      profileFetchPromise = null;
+    }
+  })();
+
+  return profileFetchPromise;
+}
+
+export function clearUserProfileCache() {
+  cachedUserProfile = null;
+  profileFetchPromise = null;
 }
 
 export async function getAllUsers() {

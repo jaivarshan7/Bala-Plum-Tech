@@ -1,7 +1,5 @@
 import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
-import { getFirebaseServices } from '../firebase/firebase-config.js';
-
-const { db } = getFirebaseServices();
+import { getCurrentUserProfile } from '../services/user-service.js';
 
 export async function renderSidebar() {
   const sidebar = document.getElementById('sidebar');
@@ -13,8 +11,8 @@ export async function renderSidebar() {
     return;
   }
 
-  const userSnap = await db.collection('users').doc(user.uid).get();
-  const role = userSnap.exists ? userSnap.data().role : 'EMPLOYEE';
+  const profile = await getCurrentUserProfile(user.uid);
+  const role = profile?.role || 'EMPLOYEE';
 
   const navItems = [
     { label: 'Dashboard', href: './dashboard.html', icon: '🏠' },

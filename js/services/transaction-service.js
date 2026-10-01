@@ -1,12 +1,20 @@
 import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getCurrentUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from './user-service.js';
 
 const { db } = getFirebaseServices();
 
 export async function createTransaction({ itemId, itemName, type, quantity, previousQuantity, newQuantity, reason, notes }) {
   const user = getCurrentUser();
-  const userSnap = await db.collection('users').doc(user.uid).get();
-  const employeeName = userSnap.exists ? userSnap.data().fullName || user.email : user.email;
+  let employeeName = user.displayName || user.email;
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (profile?.fullName) {
+      employeeName = profile.fullName;
+    }
+  } catch (err) {
+    // Fall back to displayName or email
+  }
 
   const payload = {
     itemId,

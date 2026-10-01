@@ -3,16 +3,43 @@ import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
 import { ROLE_LABELS } from '../utils/constants.js';
 import { formatDate } from '../utils/helpers.js';
 
+function renderEmployeeSkeletons() {
+  const tbody = document.getElementById('employeesTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = Array.from({ length: 4 }).map(() => `
+    <tr>
+      <td><span class="skeleton skeleton-text" style="width: 140px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 180px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 80px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 60px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 100px;">&nbsp;</span></td>
+      <td><span class="skeleton skeleton-text" style="width: 100px;">&nbsp;</span></td>
+    </tr>
+  `).join('');
+}
+
 async function loadEmployees() {
   const user = getCurrentUser();
   if (!user) return;
+
+  renderEmployeeSkeletons();
 
   let list;
   try {
     list = await getAllUsers();
   } catch (error) {
     console.error('Unable to load employees:', error);
-    document.getElementById('employeesTableBody').innerHTML = '<tr><td colspan="6"><div class="empty-state">Employees could not be loaded. Check Firestore rules.</div></td></tr>';
+    document.getElementById('employeesTableBody').innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="empty-state">
+            <p>Employees could not be loaded. Check connection or Firestore rules.</p>
+            <button id="retryEmployeesBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
+          </div>
+        </td>
+      </tr>
+    `;
+    document.getElementById('retryEmployeesBtn')?.addEventListener('click', loadEmployees);
     return;
   }
   const rows = list.map((person) => `
