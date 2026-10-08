@@ -19,6 +19,13 @@ export function validateInventoryInput(data) {
     return 'Minimum stock cannot be negative.';
   }
 
+  if (data.imageUrl && typeof data.imageUrl === 'string') {
+    const trimmed = data.imageUrl.trim();
+    if (trimmed.startsWith('data:')) {
+      return 'Base64 image data is not allowed. Please provide a direct image URL.';
+    }
+  }
+
   return null;
 }
 

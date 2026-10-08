@@ -3,6 +3,7 @@ import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getInventoryItems, getInventoryStatus, createInventoryItem, updateInventoryItem } from '../services/inventory-service.js';
 import { DEFAULT_CATEGORIES, PLUMBING_CATEGORIES, UNITS } from '../utils/constants.js';
 import { validateInventoryInput } from '../utils/validation.js';
+import { escapeHtml } from '../utils/helpers.js';
 
 const { db } = getFirebaseServices();
 const inventoryTableBody = document.getElementById('inventoryTableBody');
@@ -15,11 +16,97 @@ const addItemButton = document.getElementById('addItemButton');
 const inventoryForm = document.getElementById('inventoryForm');
 const itemModal = document.getElementById('itemModal');
 
+const imageUrlInput = document.getElementById('imageUrlInput');
+const removeImageBtn = document.getElementById('removeImageBtn');
+const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+const imagePreviewBox = document.getElementById('imagePreviewBox');
+const previewTitle = document.getElementById('previewTitle');
+
 let inventoryData = [];
 let editingItemId = null;
 let categorySelect;
 let subcategorySelect;
 let brandSelect;
+let previewRequestId = 0;
+
+function setPreviewState(state, payload = {}) {
+  if (state === 'hidden') {
+    imagePreviewContainer?.classList.add('hidden');
+    if (imagePreviewBox) imagePreviewBox.innerHTML = '';
+    removeImageBtn?.classList.add('hidden');
+    return;
+  }
+
+  imagePreviewContainer?.classList.remove('hidden');
+  removeImageBtn?.classList.remove('hidden');
+  if (previewTitle) {
+    previewTitle.textContent = editingItemId ? 'Current Preview' : 'Preview';
+  }
+
+  if (state === 'loading') {
+    imagePreviewBox.innerHTML = `
+      <div class="image-preview-status preview-loading">
+        <span class="preview-spinner">⏳</span>
+        <span>Loading image preview...</span>
+      </div>
+    `;
+  } else if (state === 'loaded') {
+    imagePreviewBox.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = payload.url;
+    img.alt = 'Product preview';
+    img.className = 'modal-preview-img';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    imagePreviewBox.appendChild(img);
+  } else if (state === 'error') {
+    imagePreviewBox.innerHTML = `
+      <div class="image-preview-status preview-error">
+        <span class="status-icon">⚠</span>
+        <div>
+          <strong>Image could not be loaded</strong>
+          <p>Check that this is a direct image URL.</p>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function handleImageUrlChange(url) {
+  const rawUrl = (url || '').trim();
+  const reqId = ++previewRequestId;
+
+  if (!rawUrl) {
+    setPreviewState('hidden');
+    return;
+  }
+
+  let isValidHttpUrl = false;
+  try {
+    const parsed = new URL(rawUrl);
+    isValidHttpUrl = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !rawUrl.startsWith('data:');
+  } catch {
+    isValidHttpUrl = false;
+  }
+
+  if (!isValidHttpUrl) {
+    setPreviewState('error');
+    return;
+  }
+
+  setPreviewState('loading');
+
+  const imgTest = new Image();
+  imgTest.onload = () => {
+    if (reqId !== previewRequestId) return;
+    setPreviewState('loaded', { url: rawUrl });
+  };
+  imgTest.onerror = () => {
+    if (reqId !== previewRequestId) return;
+    setPreviewState('error');
+  };
+  imgTest.src = rawUrl;
+}
 
 function renderCategoryOptions() {
   const options = DEFAULT_CATEGORIES;
@@ -95,7 +182,7 @@ function renderFilterOptions() {
   const categories = [...new Set(inventoryData.map((item) => item.category).filter(Boolean))];
   const subcategories = [...new Set(inventoryData.map((item) => item.subcategory).filter(Boolean))];
   const brands = [...new Set(inventoryData.map((item) => item.brand).filter(Boolean))];
-  categoryFilter.innerHTML = '<option value="">All Categories</option>' + categories.map((item) => `<option value="${item}">${item}</option>`).join('');
+  categoryFilter.innerHTML = '<option value="">All Categories</option>' + categories.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
   subcategoryFilter.innerHTML = '<option value="">All Subcategories</option>' + subcategories.map((item) => `<option value="${item}">${item}</option>`).join('');
   brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map((item) => `<option value="${item}">${item}</option>`).join('');
 }
@@ -123,10 +210,38 @@ function getFilteredInventory() {
   });
 }
 
+function renderItemThumbnail(item) {
+  const imageUrl = item.imageUrl && typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
+  if (!imageUrl) {
+    return '<div class="item-thumb-placeholder" title="No image" aria-label="No image">—</div>';
+  }
+
+  const safeUrl = escapeHtml(imageUrl);
+  const safeAlt = escapeHtml(item.name || 'Product');
+
+  return `
+    <div class="item-thumb-container">
+      <img
+        src="${safeUrl}"
+        alt="${safeAlt}"
+        class="item-image-thumb"
+        width="48"
+        height="48"
+        loading="lazy"
+        decoding="async"
+        onerror="this.onerror=null; this.classList.add('hidden'); if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');"
+      />
+      <div class="item-thumb-placeholder item-thumb-fallback hidden" title="Image unavailable" aria-label="Image unavailable">
+        <span class="fallback-icon">⚠</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderInventoryTable() {
   const filtered = getFilteredInventory();
   if (!filtered.length) {
-    inventoryTableBody.innerHTML = '<tr><td colspan="9"><div class="empty-state">No inventory records could be found.</div></td></tr>';
+    inventoryTableBody.innerHTML = '<tr><td colspan="10"><div class="empty-state">No inventory records could be found.</div></td></tr>';
     return;
   }
 
@@ -134,13 +249,14 @@ function renderInventoryTable() {
     const status = getInventoryStatus(item);
     return `
       <tr>
-        <td><a href="./item-details.html?id=${item.id}">${item.name}</a></td>
-        <td>${item.category}</td>
-        <td>${item.subcategory || '—'}</td>
-        <td>${item.brand || '—'}</td>
-        <td>${item.size || '—'}</td>
+        <td class="col-thumb">${renderItemThumbnail(item)}</td>
+        <td><a href="./item-details.html?id=${item.id}">${escapeHtml(item.name)}</a></td>
+        <td>${escapeHtml(item.category)}</td>
+        <td>${escapeHtml(item.subcategory || '—')}</td>
+        <td>${escapeHtml(item.brand || '—')}</td>
+        <td>${escapeHtml(item.size || '—')}</td>
         <td>${getStock(item)}</td>
-        <td>${item.unit || '—'}</td>
+        <td>${escapeHtml(item.unit || '—')}</td>
         <td><span class="status-pill ${status.className}">${status.label}</span></td>
         <td>
           <div class="row-actions">
@@ -161,6 +277,7 @@ function getStock(item) {
 function renderTableSkeletons() {
   inventoryTableBody.innerHTML = Array.from({ length: 6 }).map(() => `
     <tr>
+      <td class="col-thumb"><span class="skeleton" style="width: 48px; height: 48px; border-radius: 10px; display: inline-block;">&nbsp;</span></td>
       <td><span class="skeleton skeleton-text" style="width: 140px;">&nbsp;</span></td>
       <td><span class="skeleton skeleton-text" style="width: 80px;">&nbsp;</span></td>
       <td><span class="skeleton skeleton-text" style="width: 80px;">&nbsp;</span></td>
@@ -191,7 +308,7 @@ async function loadInventoryPage(user) {
     inventoryData = [];
     inventoryTableBody.innerHTML = `
       <tr>
-        <td colspan="9">
+        <td colspan="10">
           <div class="empty-state">
             <p>Unable to load inventory. Please check your network connection.</p>
             <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
@@ -215,10 +332,24 @@ subcategoryFilter.addEventListener('change', renderInventoryTable);
 brandFilter.addEventListener('change', renderInventoryTable);
 stockFilter.addEventListener('change', renderInventoryTable);
 
+const debouncedPreviewUpdate = debounce((val) => handleImageUrlChange(val), 250);
+
+imageUrlInput?.addEventListener('input', (e) => {
+  debouncedPreviewUpdate(e.target.value);
+});
+
+removeImageBtn?.addEventListener('click', () => {
+  if (imageUrlInput) imageUrlInput.value = '';
+  handleImageUrlChange('');
+  imageUrlInput?.focus();
+});
+
 addItemButton.addEventListener('click', () => {
   editingItemId = null;
   document.getElementById('itemModalTitle').textContent = 'Add Inventory Item';
   inventoryForm.reset();
+  if (imageUrlInput) imageUrlInput.value = '';
+  handleImageUrlChange('');
   categorySelect?.clear(true);
   subcategorySelect?.clear(true);
   brandSelect?.clear(true);
@@ -239,6 +370,10 @@ inventoryTableBody.addEventListener('click', (event) => {
     unit: item.unit || '', size: item.size || '', stock: getStock(item),
     minimumStock: Number(item.minimumStock ?? item.minimumQuantity ?? 0), unitCost: item.unitCost ?? '', storageLocation: item.storageLocation || '', description: item.description || ''
   }).forEach(([field, value]) => { if (inventoryForm.elements[field]) inventoryForm.elements[field].value = value; });
+  if (imageUrlInput) {
+    imageUrlInput.value = item.imageUrl || '';
+    handleImageUrlChange(item.imageUrl || '');
+  }
   categorySelect?.setValue(item.category || '', true);
   updateSubcategoryOptions(item.category || '', item.subcategory || '');
   if (item.brand && brandSelect) {
@@ -265,6 +400,9 @@ inventoryForm.addEventListener('submit', async (event) => {
   const originalButtonText = submitButton ? submitButton.textContent : 'Save';
 
   const formData = new FormData(inventoryForm);
+  const rawImageUrl = String(formData.get('imageUrl') || '').trim();
+  const safeImageUrl = rawImageUrl.startsWith('data:') ? '' : rawImageUrl;
+
   const payload = {
     name: String(formData.get('name') || '').trim(),
     description: String(formData.get('description') || '').trim(),
@@ -274,6 +412,7 @@ inventoryForm.addEventListener('submit', async (event) => {
     brand: String(formData.get('brand') || '').trim(),
     size: String(formData.get('size') || '').trim(),
     unit: String(formData.get('unit') || '').trim(),
+    imageUrl: safeImageUrl,
     stock: Number(formData.get('stock') || 0),
     minimumStock: Number(formData.get('minimumStock') || 0),
     quantity: Number(formData.get('stock') || 0),
@@ -298,6 +437,8 @@ inventoryForm.addEventListener('submit', async (event) => {
     if (editingItemId) await updateInventoryItem(editingItemId, payload);
     else await createInventoryItem(payload);
     inventoryForm.reset();
+    if (imageUrlInput) imageUrlInput.value = '';
+    handleImageUrlChange('');
     categorySelect?.clear(true);
     subcategorySelect?.clear(true);
     brandSelect?.clear(true);

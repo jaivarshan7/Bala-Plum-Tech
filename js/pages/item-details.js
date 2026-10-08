@@ -2,7 +2,7 @@ import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
 import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getItemById, getInventoryStatus, updateInventoryItem } from '../services/inventory-service.js';
 import { getTransactionsForItem, createTransaction } from '../services/transaction-service.js';
-import { formatDate } from '../utils/helpers.js';
+import { formatDate, escapeHtml } from '../utils/helpers.js';
 
 const { db } = getFirebaseServices();
 const urlParams = new URLSearchParams(window.location.search);
@@ -13,6 +13,7 @@ function renderItemDetailsSkeletons() {
   if (!container) return;
   container.innerHTML = `
     <div class="item-card">
+      <div class="skeleton" style="width: 100%; aspect-ratio: 4/3; max-height: 240px; border-radius: 14px; margin-bottom: 18px;"></div>
       <div class="skeleton skeleton-row" style="width: 60%; height: 32px;"></div>
       <div class="skeleton skeleton-row"></div>
       <div class="skeleton skeleton-row"></div>
@@ -63,24 +64,55 @@ async function loadItemDetails() {
 
     const status = getInventoryStatus(item);
     const currentStock = Number(item.stock ?? item.quantity ?? 0);
+    const hasImage = Boolean(item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim());
+    const safeImageUrl = hasImage ? escapeHtml(item.imageUrl.trim()) : '';
+    const safeItemName = escapeHtml(item.name || 'Product');
+
+    const imageHtml = hasImage ? `
+      <div class="item-large-image-wrapper">
+        <img
+          src="${safeImageUrl}"
+          alt="${safeItemName}"
+          class="item-image-large"
+          loading="lazy"
+          decoding="async"
+          onerror="this.onerror=null; this.classList.add('hidden'); if(this.nextElementSibling) this.nextElementSibling.classList.remove('hidden');"
+        />
+        <div class="item-image-large-placeholder item-image-large-fallback hidden" title="Image unavailable">
+          <span class="placeholder-icon">⚠</span>
+          <p class="placeholder-title">Image unavailable</p>
+          <span class="placeholder-sub">The product image link could not be loaded</span>
+        </div>
+      </div>
+    ` : `
+      <div class="item-large-image-wrapper">
+        <div class="item-image-large-placeholder">
+          <span class="placeholder-icon">📦</span>
+          <p class="placeholder-title">No image available</p>
+          <span class="placeholder-sub">No product image has been provided</span>
+        </div>
+      </div>
+    `;
 
     const content = `
       <div class="item-card">
+        ${imageHtml}
         <div class="detail-meta">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-            <h2>${item.name}</h2>
+            <h2>${safeItemName}</h2>
             <span class="status-pill ${status.className}">${status.label}</span>
           </div>
-          <div class="info-row"><span>SKU</span><strong>${item.sku || '—'}</strong></div>
-          <div class="info-row"><span>Category</span><strong>${item.category || '—'}</strong></div>
-          <div class="info-row"><span>Subcategory</span><strong>${item.subcategory || '—'}</strong></div>
-          <div class="info-row"><span>Brand</span><strong>${item.brand || '—'}</strong></div>
-          <div class="info-row"><span>Size</span><strong>${item.size || '—'}</strong></div>
+          <div class="info-row"><span>SKU</span><strong>${escapeHtml(item.sku) || '—'}</strong></div>
+          <div class="info-row"><span>Category</span><strong>${escapeHtml(item.category) || '—'}</strong></div>
+          <div class="info-row"><span>Subcategory</span><strong>${escapeHtml(item.subcategory) || '—'}</strong></div>
+          <div class="info-row"><span>Brand</span><strong>${escapeHtml(item.brand) || '—'}</strong></div>
+          <div class="info-row"><span>Size</span><strong>${escapeHtml(item.size) || '—'}</strong></div>
           <div class="info-row"><span>Stock</span><strong id="itemStockDisplay">${currentStock}</strong></div>
           <div class="info-row"><span>Minimum</span><strong>${item.minimumStock ?? item.minimumQuantity ?? 0}</strong></div>
-          <div class="info-row"><span>Unit</span><strong>${item.unit || '—'}</strong></div>
-          <div class="info-row"><span>Storage</span><strong>${item.storageLocation || '—'}</strong></div>
+          <div class="info-row"><span>Unit</span><strong>${escapeHtml(item.unit) || '—'}</strong></div>
+          <div class="info-row"><span>Storage</span><strong>${escapeHtml(item.storageLocation) || '—'}</strong></div>
           <div class="info-row"><span>Unit Cost</span><strong>${item.unitCost ? '₹' + item.unitCost : '—'}</strong></div>
+          ${item.description ? `<div class="info-row"><span>Description</span><strong>${escapeHtml(item.description)}</strong></div>` : ''}
         </div>
         <div style="margin-top: 20px;">
           <a href="./inventory.html" class="btn btn-secondary">← Back to Inventory</a>
