@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Commercial Plumbing Bulk Inventory Management - Fast Spreadsheet Entry & CSV Import" />
+    <title>Bala Plumb Tech | Bulk Add Items</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>" />
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.gstatic.com" />
+    <link rel="stylesheet" href="./css/main.css" />
+    <link rel="stylesheet" href="./css/inventory.css" />
+    <link rel="stylesheet" href="./css/forms.css" />
+    <link rel="stylesheet" href="./css/responsive.css" />
+    <link rel="stylesheet" href="./css/bulk-inventory.css" />
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script type="module" src="./js/pages/bulk-inventory.js"></script>
+  </head>
+  <body>
+    <div id="appShell" class="app-shell">
+      <aside id="sidebar" class="sidebar"></aside>
+      <div class="main-panel">
+        <header id="topbar" class="topbar"></header>
+        <main class="page-content bulk-page-content">
+          <!-- Page Header -->
+          <div class="page-header with-actions bulk-page-header">
+            <div>
+              <div class="breadcrumb">
+                <a href="./inventory.html" class="back-link">← Back to Inventory</a>
+              </div>
+              <h1 class="bulk-title">Bulk Add Inventory</h1>
+              <p class="bulk-subtitle">Fast spreadsheet entry, copy & paste from Excel/Sheets, or import CSV</p>
+            </div>
+            <div class="header-actions">
+              <button type="button" id="downloadTemplateBtn" class="btn btn-secondary">
+                <span>📄</span> Download CSV Template
+              </button>
+              <button type="button" id="importCsvBtn" class="btn btn-secondary">
+                <span>📥</span> Import CSV
+              </button>
+              <input type="file" id="csvFileInput" accept=".csv" class="hidden" />
+              <button type="button" id="saveAllBtn" class="btn btn-primary" disabled>
+                <span>💾</span> Save All Items
+              </button>
+            </div>
+          </div>
+
+          <!-- Drag and Drop Zone -->
+          <div id="csvDropZone" class="csv-drop-zone">
+            <div class="drop-zone-content">
+              <span class="drop-icon">📂</span>
+              <div>
+                <strong>Drop a CSV file here</strong>, or <button type="button" class="btn-link" id="browseCsvBtn">browse from your computer</button>
+                <p class="drop-hint">You can also copy cells from Excel or Google Sheets and press <kbd>Ctrl+V</kbd> anywhere on this page.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Spreadsheet Toolbar & Stats Bar -->
+          <section class="bulk-toolbar panel">
+            <div class="toolbar-left">
+              <button type="button" id="addRowBtn" class="btn btn-secondary btn-sm">
+                <span>+</span> Add Row
+              </button>
+              <button type="button" id="addMultipleRowsBtn" class="btn btn-secondary btn-sm">
+                <span>+</span> Add 5 Rows
+              </button>
+              <button type="button" id="deleteSelectedBtn" class="btn btn-danger-outline btn-sm" disabled>
+                <span>🗑</span> Delete Selected
+              </button>
+              <button type="button" id="clearAllBtn" class="btn btn-secondary btn-sm">
+                Clear All
+              </button>
+            </div>
+
+            <div class="toolbar-right">
+              <div class="validation-summary-badges">
+                <span id="badgeTotalRows" class="summary-badge total-badge">0 Rows</span>
+                <span id="badgeValidRows" class="summary-badge valid-badge">✓ 0 Valid</span>
+                <span id="badgeErrorRows" class="summary-badge error-badge">⚠ 0 Errors</span>
+              </div>
+              <button type="button" id="validateBtn" class="btn btn-secondary btn-sm">
+                <span>🔍</span> Re-Validate
+              </button>
+            </div>
+          </section>
+
+          <!-- Desktop Spreadsheet Table View -->
+          <section class="panel bulk-table-panel">
+            <div class="bulk-table-container" id="bulkTableContainer">
+              <table class="bulk-table" id="bulkTable">
+                <thead>
+                  <tr>
+                    <th class="col-select">
+                      <input type="checkbox" id="selectAllCheckbox" title="Select all rows" aria-label="Select all rows" />
+                    </th>
+                    <th class="col-num">#</th>
+                    <th class="col-status" title="Row Validation Status">Status</th>
+                    <th class="col-name required-col">Product Name *</th>
+                    <th class="col-sku">SKU</th>
+                    <th class="col-cat required-col">Category *</th>
+                    <th class="col-subcat required-col">Subcategory *</th>
+                    <th class="col-unit required-col">Unit *</th>
+                    <th class="col-brand">Brand</th>
+                    <th class="col-size">Size</th>
+                    <th class="col-stock required-col">Stock *</th>
+                    <th class="col-min-stock required-col">Min Stock *</th>
+                    <th class="col-cost">Unit Cost</th>
+                    <th class="col-location">Location</th>
+                    <th class="col-image">Image URL</th>
+                    <th class="col-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="bulkTableBody">
+                  <!-- Dynamically populated rows -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mobile Card Editor Container (visible on <= 768px) -->
+            <div class="bulk-mobile-container hidden" id="bulkMobileContainer">
+              <div class="mobile-cards-list" id="bulkMobileCardsList">
+                <!-- Dynamically populated cards on mobile -->
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="bulkEmptyState" class="bulk-empty-state hidden">
+              <div class="empty-icon">📋</div>
+              <h3>No items in the spreadsheet</h3>
+              <p>Click "+ Add Row" to begin entering products, copy & paste rows from Excel/Sheets, or import a CSV file.</p>
+              <div class="empty-actions">
+                <button type="button" class="btn btn-primary" id="emptyAddRowBtn">+ Add Row</button>
+                <button type="button" class="btn btn-secondary" id="emptyImportBtn">Import CSV</button>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Confirm Save Modal -->
+    <div id="confirmSaveModal" class="modal hidden" aria-hidden="true" role="dialog">
+      <div class="modal-content modal-sm">
+        <div class="modal-header">
+          <h2>Confirm Bulk Save</h2>
+          <button class="close-button" type="button" data-close-modal="confirmSaveModal" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirmSaveMessage">Are you sure you want to save these items to inventory?</p>
+          <div class="confirm-stats-box">
+            <div class="stat-item">
+              <span class="stat-number" id="confirmCount">0</span>
+              <span class="stat-label">Items Ready</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number text-success" id="confirmValidCount">0</span>
+              <span class="stat-label">Valid Items</span>
+            </div>
+          </div>
+          <p class="small-muted">Items will be written to Firestore inventory in safe, chunked batches.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="confirmSaveModal">Cancel</button>
+          <button type="button" id="executeSaveBtn" class="btn btn-primary">Confirm & Save Items</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Progress Modal -->
+    <div id="progressModal" class="modal hidden" aria-hidden="true" role="dialog" data-backdrop="static">
+      <div class="modal-content modal-sm">
+        <div class="modal-header">
+          <h2 id="progressTitle">Adding Inventory Items...</h2>
+        </div>
+        <div class="modal-body">
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+          </div>
+          <div class="progress-status-text">
+            <span id="progressCountText">0 / 0 items</span>
+            <span id="progressPercentText">0%</span>
+          </div>
+          <p class="progress-note small-muted">Saving in safe Firestore batches. Please do not close this window.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result / Completion Modal -->
+    <div id="resultModal" class="modal hidden" aria-hidden="true" role="dialog">
+      <div class="modal-content modal-sm">
+        <div class="modal-header">
+          <h2 id="resultTitle">Import Completed</h2>
+          <button class="close-button" type="button" data-close-modal="resultModal" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+          <div id="resultStatusIcon" class="result-status-icon">✓</div>
+          <p id="resultMessage" class="result-message">Inventory items added successfully.</p>
+          <div id="resultDetails" class="result-details hidden"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="resultAddMoreBtn" class="btn btn-secondary">Add More Items</button>
+          <a href="./inventory.html" class="btn btn-primary">View Inventory</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Hover / Preview Popover -->
+    <div id="tableImagePreviewPopover" class="image-popover hidden">
+      <img id="popoverImg" src="" alt="Thumbnail preview" />
+    </div>
+
+    <script type="module" src="./js/components/sidebar.js"></script>
+    <script type="module" src="./js/components/navbar.js"></script>
+  </body>
+</html>

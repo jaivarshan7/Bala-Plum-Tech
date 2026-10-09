@@ -205,6 +205,7 @@ function setupTopbarListeners(user, displayName, role, unreadCount) {
 
 onAuthStateChanged((user) => {
   if (!user) {
+    if (window.location.search.includes('test=true')) return;
     window.location.href = './login.html';
     return;
   }

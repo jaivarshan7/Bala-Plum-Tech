@@ -59,6 +59,89 @@ export async function createInventoryItem(itemData) {
   return ref.id;
 }
 
+export async function createInventoryItemsBatch(items, onProgress = null) {
+  const BATCH_SIZE = 400; // Safe buffer below Firestore's 500-operation limit
+  const results = {
+    total: items.length,
+    successCount: 0,
+    failedCount: 0,
+    createdIds: [],
+    errors: []
+  };
+
+  if (!items || !items.length) {
+    return results;
+  }
+
+  const chunks = [];
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    chunks.push(items.slice(i, i + BATCH_SIZE));
+  }
+
+  let processed = 0;
+  for (let c = 0; c < chunks.length; c++) {
+    const chunk = chunks[c];
+    const batch = db.batch();
+    const chunkRefs = [];
+
+    for (const item of chunk) {
+      const ref = db.collection('inventory').doc();
+      const payload = {
+        ...item,
+        name: String(item.name || '').trim(),
+        sku: String(item.sku || '').trim(),
+        category: String(item.category || '').trim(),
+        subcategory: String(item.subcategory || '').trim(),
+        unit: String(item.unit || '').trim(),
+        brand: String(item.brand || '').trim(),
+        size: String(item.size || '').trim(),
+        description: String(item.description || '').trim(),
+        storageLocation: String(item.storageLocation || '').trim(),
+        imageUrl: String(item.imageUrl || '').trim(),
+        stock: Number(item.stock ?? item.quantity ?? 0),
+        minimumStock: Number(item.minimumStock ?? item.minimumQuantity ?? 0),
+        quantity: Number(item.stock ?? item.quantity ?? 0),
+        minimumQuantity: Number(item.minimumStock ?? item.minimumQuantity ?? 0),
+        unitCost: item.unitCost !== '' && item.unitCost !== null && item.unitCost !== undefined ? Number(item.unitCost) : 0,
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      batch.set(ref, payload);
+      chunkRefs.push(ref.id);
+    }
+
+    try {
+      await batch.commit();
+      results.successCount += chunk.length;
+      results.createdIds.push(...chunkRefs);
+    } catch (err) {
+      console.error(`Error committing batch ${c + 1}/${chunks.length}:`, err);
+      results.failedCount += chunk.length;
+      results.errors.push({
+        batchIndex: c,
+        itemCount: chunk.length,
+        message: err.message || 'Batch commit failed'
+      });
+    }
+
+    processed += chunk.length;
+    if (typeof onProgress === 'function') {
+      try {
+        onProgress(processed, items.length);
+      } catch (progressErr) {
+        console.warn('Progress callback error:', progressErr);
+      }
+    }
+  }
+
+  if (results.successCount > 0) {
+    invalidateInventoryCache();
+  }
+
+  return results;
+}
+
 export async function updateInventoryItem(itemId, itemData) {
   await db.collection('inventory').doc(itemId).update({
     ...itemData,

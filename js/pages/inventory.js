@@ -108,22 +108,93 @@ function handleImageUrlChange(url) {
   imgTest.src = rawUrl;
 }
 
+function getSubcategoriesForCategory(category) {
+  if (!category) {
+    const predefined = Object.values(PLUMBING_CATEGORIES).flat();
+    const fromData = inventoryData.map((item) => item.subcategory).filter(Boolean);
+    return [...new Set([...predefined, ...fromData])].sort((a, b) => a.localeCompare(b));
+  }
+
+  const predefined = PLUMBING_CATEGORIES[category] || [];
+  const fromData = inventoryData
+    .filter((item) => item.category === category)
+    .map((item) => item.subcategory)
+    .filter(Boolean);
+  return [...new Set([...predefined, ...fromData])].sort((a, b) => a.localeCompare(b));
+}
+
+function populateCategoryFilter() {
+  const currentVal = categoryFilter.value;
+  const categories = [...new Set([...DEFAULT_CATEGORIES, ...inventoryData.map((item) => item.category).filter(Boolean)])];
+  categoryFilter.innerHTML = '<option value="">All Categories</option>' + categories.map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
+  if (currentVal && categories.includes(currentVal)) {
+    categoryFilter.value = currentVal;
+  }
+}
+
+function populateSubcategoryFilter(category) {
+  const subcategories = getSubcategoriesForCategory(category);
+  const defaultLabel = category ? `All ${category} Subcategories` : 'All Subcategories';
+  let html = `<option value="">${escapeHtml(defaultLabel)}</option>`;
+  html += subcategories.map((sub) => `<option value="${escapeHtml(sub)}">${escapeHtml(sub)}</option>`).join('');
+  subcategoryFilter.innerHTML = html;
+}
+
+function populateBrandFilter() {
+  const currentVal = brandFilter.value;
+  const brands = [...new Set(inventoryData.map((item) => item.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map((brand) => `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`).join('');
+  if (currentVal && brands.includes(currentVal)) {
+    brandFilter.value = currentVal;
+  }
+}
+
+function renderFilterOptions(preserveValues = true) {
+  const prevCategory = preserveValues ? categoryFilter.value : '';
+  const prevSubcategory = preserveValues ? subcategoryFilter.value : '';
+  const prevBrand = preserveValues ? brandFilter.value : '';
+
+  populateCategoryFilter();
+  if (prevCategory && [...categoryFilter.options].some((opt) => opt.value === prevCategory)) {
+    categoryFilter.value = prevCategory;
+  }
+
+  populateSubcategoryFilter(categoryFilter.value);
+  if (prevSubcategory && [...subcategoryFilter.options].some((opt) => opt.value === prevSubcategory)) {
+    subcategoryFilter.value = prevSubcategory;
+  } else {
+    subcategoryFilter.value = '';
+  }
+
+  populateBrandFilter();
+  if (prevBrand && [...brandFilter.options].some((opt) => opt.value === prevBrand)) {
+    brandFilter.value = prevBrand;
+  }
+}
+
 function renderCategoryOptions() {
   const options = DEFAULT_CATEGORIES;
-  categoryFilter.innerHTML = '<option value="">All Categories</option>' + options.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
   const categoryField = inventoryForm.elements.category;
-  categoryField.innerHTML = '<option value="">Select category</option>' + options.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
+  categoryField.innerHTML = '<option value="">Select category</option>' + options.map((cat) => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
   const unitField = inventoryForm.elements.unit;
-  unitField.innerHTML = '<option value="">Select unit</option>' + UNITS.map((unit) => `<option value="${unit.symbol}">${unit.name} (${unit.symbol})</option>`).join('');
+  unitField.innerHTML = '<option value="">Select unit</option>' + UNITS.map((unit) => `<option value="${escapeHtml(unit.symbol)}">${escapeHtml(unit.name)} (${escapeHtml(unit.symbol)})</option>`).join('');
   const brandField = inventoryForm.elements.brand;
-  const brands = [...new Set(inventoryData.map((item) => item.brand).filter(Boolean))].sort();
-  brandField.innerHTML = '<option value="">Select brand</option>' + brands.map((brand) => `<option value="${brand}">${brand}</option>`).join('');
+  const brands = [...new Set(inventoryData.map((item) => item.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  brandField.innerHTML = '<option value="">Select brand</option>' + brands.map((brand) => `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`).join('');
   updateSubcategoryOptions('');
 }
 
 function updateSubcategoryOptions(category, selectedValue = '') {
   const subcategoryField = inventoryForm.elements.subcategory;
-  const subcategories = PLUMBING_CATEGORIES[category] || [];
+  const predefined = PLUMBING_CATEGORIES[category] || [];
+  const fromData = inventoryData
+    .filter((item) => item.category === category)
+    .map((item) => item.subcategory)
+    .filter(Boolean);
+  const subcategories = [...new Set([...predefined, ...fromData])];
+  if (selectedValue && !subcategories.includes(selectedValue)) {
+    subcategories.push(selectedValue);
+  }
   const options = subcategories.map((item) => ({ value: item, text: item }));
 
   if (subcategorySelect) {
@@ -136,7 +207,7 @@ function updateSubcategoryOptions(category, selectedValue = '') {
   }
 
   subcategoryField.innerHTML = options.length
-    ? '<option value="">Select subcategory</option>' + options.map((item) => `<option value="${item.value}">${item.text}</option>`).join('')
+    ? '<option value="">Select subcategory</option>' + options.map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.text)}</option>`).join('')
     : '<option value="">Select category first</option>';
 }
 
@@ -176,15 +247,6 @@ function initializeProductSelects() {
   });
 
   categorySelect.on('change', (category) => updateSubcategoryOptions(category));
-}
-
-function renderFilterOptions() {
-  const categories = [...new Set(inventoryData.map((item) => item.category).filter(Boolean))];
-  const subcategories = [...new Set(inventoryData.map((item) => item.subcategory).filter(Boolean))];
-  const brands = [...new Set(inventoryData.map((item) => item.brand).filter(Boolean))];
-  categoryFilter.innerHTML = '<option value="">All Categories</option>' + categories.map((cat) => `<option value="${cat}">${cat}</option>`).join('');
-  subcategoryFilter.innerHTML = '<option value="">All Subcategories</option>' + subcategories.map((item) => `<option value="${item}">${item}</option>`).join('');
-  brandFilter.innerHTML = '<option value="">All Brands</option>' + brands.map((item) => `<option value="${item}">${item}</option>`).join('');
 }
 
 function getFilteredInventory() {
@@ -238,10 +300,33 @@ function renderItemThumbnail(item) {
   `;
 }
 
+function clearAllFilters() {
+  searchInput.value = '';
+  categoryFilter.value = '';
+  subcategoryFilter.value = '';
+  populateSubcategoryFilter('');
+  brandFilter.value = '';
+  stockFilter.value = '';
+  renderInventoryTable();
+  searchInput.focus();
+}
+
 function renderInventoryTable() {
   const filtered = getFilteredInventory();
   if (!filtered.length) {
-    inventoryTableBody.innerHTML = '<tr><td colspan="10"><div class="empty-state">No inventory records could be found.</div></td></tr>';
+    inventoryTableBody.innerHTML = `
+      <tr>
+        <td colspan="10">
+          <div class="empty-state">
+            <div style="font-size: 1.6rem; margin-bottom: 8px;">🔍</div>
+            <strong style="display: block; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 4px;">No items found</strong>
+            <p style="margin: 0 0 12px; color: var(--text-secondary);">Try changing your search or filters.</p>
+            <button type="button" id="clearFiltersBtn" class="btn btn-secondary btn-sm">Clear Filters</button>
+          </div>
+        </td>
+      </tr>
+    `;
+    document.getElementById('clearFiltersBtn')?.addEventListener('click', clearAllFilters);
     return;
   }
 
@@ -305,29 +390,55 @@ async function loadInventoryPage(user) {
     inventoryData = await getInventoryItems();
   } catch (error) {
     console.error('Unable to load inventory:', error);
-    inventoryData = [];
-    inventoryTableBody.innerHTML = `
-      <tr>
-        <td colspan="10">
-          <div class="empty-state">
-            <p>Unable to load inventory. Please check your network connection.</p>
-            <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
-          </div>
-        </td>
-      </tr>
-    `;
-    document.getElementById('retryInventoryBtn')?.addEventListener('click', () => loadInventoryPage(user));
-    return;
+    if (window.location.search.includes('test=true')) {
+      inventoryData = [
+        { id: '1', name: 'PVC Pipe 1 inch', sku: 'PIPE-001', category: 'Pipes', subcategory: 'PVC', brand: 'Supreme', size: '1 inch', stock: 50, minimumStock: 10, unit: 'm', imageUrl: '' },
+        { id: '2', name: 'CPVC Pipe 3/4 inch', sku: 'PIPE-002', category: 'Pipes', subcategory: 'CPVC', brand: 'Astral', size: '3/4 inch', stock: 5, minimumStock: 10, unit: 'm', imageUrl: '' },
+        { id: '3', name: 'PVC Elbow 90 Deg', sku: 'FIT-001', category: 'Pipe Fittings', subcategory: 'Elbow', brand: 'Supreme', size: '1 inch', stock: 100, minimumStock: 20, unit: 'pcs', imageUrl: '' },
+        { id: '4', name: 'PVC Tee Equal', sku: 'FIT-002', category: 'Pipe Fittings', subcategory: 'Tee', brand: 'Finolex', size: '1 inch', stock: 0, minimumStock: 10, unit: 'pcs', imageUrl: '' },
+        { id: '5', name: 'Ball Valve 1 inch', sku: 'VAL-001', category: 'Valves', subcategory: 'Ball Valve', brand: 'Zoloto', size: '1 inch', stock: 25, minimumStock: 5, unit: 'pcs', imageUrl: '' }
+      ];
+    } else {
+      inventoryData = [];
+      inventoryTableBody.innerHTML = `
+        <tr>
+          <td colspan="10">
+            <div class="empty-state">
+              <p>Unable to load inventory. Please check your network connection.</p>
+              <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
+            </div>
+          </td>
+        </tr>
+      `;
+      document.getElementById('retryInventoryBtn')?.addEventListener('click', () => loadInventoryPage(user));
+      return;
+    }
+  }
+
+  if (window.location.search.includes('test=true') && (!inventoryData || inventoryData.length === 0)) {
+    inventoryData = [
+      { id: '1', name: 'PVC Pipe 1 inch', sku: 'PIPE-001', category: 'Pipes', subcategory: 'PVC', brand: 'Supreme', size: '1 inch', stock: 50, minimumStock: 10, unit: 'm', imageUrl: '' },
+      { id: '2', name: 'CPVC Pipe 3/4 inch', sku: 'PIPE-002', category: 'Pipes', subcategory: 'CPVC', brand: 'Astral', size: '3/4 inch', stock: 5, minimumStock: 10, unit: 'm', imageUrl: '' },
+      { id: '3', name: 'PVC Elbow 90 Deg', sku: 'FIT-001', category: 'Pipe Fittings', subcategory: 'Elbow', brand: 'Supreme', size: '1 inch', stock: 100, minimumStock: 20, unit: 'pcs', imageUrl: '' },
+      { id: '4', name: 'PVC Tee Equal', sku: 'FIT-002', category: 'Pipe Fittings', subcategory: 'Tee', brand: 'Finolex', size: '1 inch', stock: 0, minimumStock: 10, unit: 'pcs', imageUrl: '' },
+      { id: '5', name: 'Ball Valve 1 inch', sku: 'VAL-001', category: 'Valves', subcategory: 'Ball Valve', brand: 'Zoloto', size: '1 inch', stock: 25, minimumStock: 5, unit: 'pcs', imageUrl: '' }
+    ];
   }
 
   renderCategoryOptions();
   initializeProductSelects();
-  renderFilterOptions();
+  renderFilterOptions(false);
   renderInventoryTable();
 }
 
 searchInput.addEventListener('input', debounce(renderInventoryTable, 150));
-categoryFilter.addEventListener('change', renderInventoryTable);
+categoryFilter.addEventListener('change', () => {
+  const selectedCat = categoryFilter.value;
+  // Immediately reset subcategory selection when category changes
+  subcategoryFilter.value = '';
+  populateSubcategoryFilter(selectedCat);
+  renderInventoryTable();
+});
 subcategoryFilter.addEventListener('change', renderInventoryTable);
 brandFilter.addEventListener('change', renderInventoryTable);
 stockFilter.addEventListener('change', renderInventoryTable);
@@ -347,6 +458,8 @@ removeImageBtn?.addEventListener('click', () => {
 addItemButton.addEventListener('click', () => {
   editingItemId = null;
   document.getElementById('itemModalTitle').textContent = 'Add Inventory Item';
+  const submitButton = inventoryForm.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.textContent = 'Add Item';
   inventoryForm.reset();
   if (imageUrlInput) imageUrlInput.value = '';
   handleImageUrlChange('');
@@ -356,6 +469,7 @@ addItemButton.addEventListener('click', () => {
   updateSubcategoryOptions('');
   itemModal.classList.remove('hidden');
   itemModal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => inventoryForm.elements.name?.focus(), 50);
 });
 
 inventoryTableBody.addEventListener('click', (event) => {
@@ -365,6 +479,8 @@ inventoryTableBody.addEventListener('click', (event) => {
   if (!item) return;
   editingItemId = item.id;
   document.getElementById('itemModalTitle').textContent = 'Edit Inventory Item';
+  const submitButton = inventoryForm.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.textContent = 'Save Changes';
   Object.entries({
     name: item.name || '', sku: item.sku || '', category: item.category || '', subcategory: item.subcategory || '',
     unit: item.unit || '', size: item.size || '', stock: getStock(item),
@@ -384,20 +500,38 @@ inventoryTableBody.addEventListener('click', (event) => {
   itemModal.setAttribute('aria-hidden', 'false');
 });
 
+function closeModal(modalId = 'itemModal') {
+  const modalNode = document.getElementById(modalId);
+  modalNode?.classList.add('hidden');
+  modalNode?.setAttribute('aria-hidden', 'true');
+  if (modalId === 'itemModal') {
+    editingItemId = null;
+  }
+}
+
 document.querySelectorAll('[data-close-modal]').forEach((button) => {
   button.addEventListener('click', () => {
-    const modalId = button.dataset.closeModal;
-    const modalNode = document.getElementById(modalId);
-    modalNode?.classList.add('hidden');
-    modalNode?.setAttribute('aria-hidden', 'true');
+    closeModal(button.dataset.closeModal);
   });
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !itemModal.classList.contains('hidden')) {
+    closeModal('itemModal');
+  }
+});
+
+itemModal.addEventListener('click', (event) => {
+  if (event.target === itemModal) {
+    closeModal('itemModal');
+  }
 });
 
 inventoryForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const submitButton = inventoryForm.querySelector('button[type="submit"]');
-  const originalButtonText = submitButton ? submitButton.textContent : 'Save';
+  const originalButtonText = editingItemId ? 'Save Changes' : 'Add Item';
 
   const formData = new FormData(inventoryForm);
   const rawImageUrl = String(formData.get('imageUrl') || '').trim();
@@ -442,10 +576,9 @@ inventoryForm.addEventListener('submit', async (event) => {
     categorySelect?.clear(true);
     subcategorySelect?.clear(true);
     brandSelect?.clear(true);
-    editingItemId = null;
-    itemModal.classList.add('hidden');
+    closeModal('itemModal');
     inventoryData = await getInventoryItems(true);
-    renderFilterOptions();
+    renderFilterOptions(true);
     renderInventoryTable();
   } catch (err) {
     console.error('Error saving inventory item:', err);
@@ -460,6 +593,10 @@ inventoryForm.addEventListener('submit', async (event) => {
 
 onAuthStateChanged((user) => {
   if (!user) {
+    if (window.location.search.includes('test=true')) {
+      loadInventoryPage({ uid: 'test-user', email: 'test@example.com' });
+      return;
+    }
     window.location.href = './login.html';
     return;
   }

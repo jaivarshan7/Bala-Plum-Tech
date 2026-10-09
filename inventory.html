@@ -32,24 +32,27 @@
               <p class="eyebrow">Inventory</p>
               <h1>Inventory Management</h1>
             </div>
-            <button id="addItemButton" class="btn btn-primary">+ Add Item</button>
+            <div class="page-header-actions" style="display: flex; gap: 10px; align-items: center;">
+              <a href="./bulk-inventory.html" class="btn btn-secondary">+ Bulk Add Items</a>
+              <button id="addItemButton" class="btn btn-primary">+ Add Item</button>
+            </div>
           </div>
 
           <section class="toolbar panel">
             <div class="search-wrap">
-              <input id="inventorySearch" type="search" placeholder="Search product, SKU, brand, category, size, notes..." />
+              <input id="inventorySearch" type="search" placeholder="Search product, SKU, brand, category, size, notes..." aria-label="Search inventory" />
             </div>
             <div class="toolbar-filters">
-              <select id="categoryFilter">
+              <select id="categoryFilter" aria-label="Filter by category">
                 <option value="">All Categories</option>
               </select>
-              <select id="subcategoryFilter">
+              <select id="subcategoryFilter" aria-label="Filter by subcategory">
                 <option value="">All Subcategories</option>
               </select>
-              <select id="brandFilter">
+              <select id="brandFilter" aria-label="Filter by brand">
                 <option value="">All Brands</option>
               </select>
-              <select id="stockFilter">
+              <select id="stockFilter" aria-label="Filter by stock status">
                 <option value="">All Stock</option>
                 <option value="low">Low Stock</option>
                 <option value="in">In Stock</option>
@@ -83,46 +86,119 @@
       </div>
     </div>
 
-    <div id="itemModal" class="modal hidden" aria-hidden="true">
+    <div id="itemModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="itemModalTitle">
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="itemModalTitle">Add Inventory Item</h2>
-          <button class="close-button" data-close-modal="itemModal">×</button>
+          <button class="close-button" data-close-modal="itemModal" type="button" aria-label="Close modal">×</button>
         </div>
-        <form id="inventoryForm" class="stack-form">
-          <div class="modal-form-body">
-            <div class="form-grid two-col">
-            <div class="form-group"><label>Product Name</label><input name="name" required /></div>
-            <div class="form-group"><label>SKU <span class="small-muted">(optional)</span></label><input name="sku" /></div>
-            <div class="form-group"><label>Category</label><select name="category"></select></div>
-            <div class="form-group subcategory-field"><label for="subcategoryField">Subcategory</label><select id="subcategoryField" name="subcategory" required><option value="">Select category first</option></select></div>
-            <div class="form-group"><label>Unit</label><select name="unit" required></select></div>
-            <div class="form-group"><label>Brand</label><select name="brand"></select></div>
-            <div class="form-group"><label>Size</label><input name="size" placeholder="e.g. 1/2 inch" /></div>
-            <div class="form-group"><label>Current Stock</label><input name="stock" type="number" min="0" required /></div>
-            <div class="form-group"><label>Minimum Stock</label><input name="minimumStock" type="number" min="0" required /></div>
-            <div class="form-group"><label>Unit Cost</label><input name="unitCost" type="number" min="0" step="0.01" /></div>
-            <div class="form-group"><label>Storage Location <span class="small-muted">(optional)</span></label><input name="storageLocation" /></div>
-            </div>
-            <div class="form-group image-field-group">
-              <label for="imageUrlInput">Product Image URL <span class="small-muted">(optional)</span></label>
-              <div class="image-input-control">
-                <input id="imageUrlInput" name="imageUrl" type="url" placeholder="Paste a direct image URL" autocomplete="off" />
-                <button type="button" id="removeImageBtn" class="btn btn-secondary btn-sm hidden">Remove Image</button>
+        <form id="inventoryForm" class="stack-form modal-form" autocomplete="off">
+          <div class="modal-body modal-form-body">
+            <!-- Basic Information -->
+            <div class="form-section">
+              <h3 class="form-section-title">Basic Information</h3>
+              <div class="form-grid two-col">
+                <div class="form-group">
+                  <label for="nameInput">Product Name <span class="required-indicator">*</span></label>
+                  <input id="nameInput" name="name" required autocomplete="off" tabindex="1" placeholder="e.g. PVC Elbow 90°" />
+                </div>
+                <div class="form-group">
+                  <label for="skuInput">SKU <span class="small-muted">(optional)</span></label>
+                  <input id="skuInput" name="sku" autocomplete="off" tabindex="2" placeholder="e.g. ELB-PVC-01" />
+                </div>
               </div>
-              <p class="field-hint">Optional. Use a direct image URL ending in .jpg, .jpeg, .png, .webp, etc.</p>
-              <p class="field-hint field-hint-recommendation">Need an image URL? Upload your product image to a supported image host (e.g. Cloudinary, Firebase Storage, ImgBB) and paste the direct image URL here.</p>
+            </div>
 
-              <div id="imagePreviewContainer" class="image-preview-wrapper hidden">
-                <span class="preview-title" id="previewTitle">Preview</span>
-                <div id="imagePreviewBox" class="image-preview-box"></div>
+            <!-- Classification -->
+            <div class="form-section">
+              <h3 class="form-section-title">Classification</h3>
+              <div class="form-grid two-col">
+                <div class="form-group">
+                  <label for="categoryField">Category <span class="required-indicator">*</span></label>
+                  <select id="categoryField" name="category" required tabindex="3"></select>
+                </div>
+                <div class="form-group subcategory-field">
+                  <label for="subcategoryField">Subcategory <span class="required-indicator">*</span></label>
+                  <select id="subcategoryField" name="subcategory" required tabindex="4">
+                    <option value="">Select category first</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="form-group"><label>Description</label><textarea name="description"></textarea></div>
+
+            <!-- Product Details -->
+            <div class="form-section">
+              <h3 class="form-section-title">Product Details</h3>
+              <div class="form-grid two-col">
+                <div class="form-group">
+                  <label for="unitField">Unit <span class="required-indicator">*</span></label>
+                  <select id="unitField" name="unit" required tabindex="5"></select>
+                </div>
+                <div class="form-group">
+                  <label for="brandField">Brand</label>
+                  <select id="brandField" name="brand" tabindex="6"></select>
+                </div>
+                <div class="form-group">
+                  <label for="sizeInput">Size</label>
+                  <input id="sizeInput" name="size" placeholder="e.g. 1/2 inch or 25mm" autocomplete="off" tabindex="7" />
+                </div>
+                <div class="form-group">
+                  <label for="locationInput">Storage Location <span class="small-muted">(optional)</span></label>
+                  <input id="locationInput" name="storageLocation" placeholder="e.g. Aisle 3, Bin 12" autocomplete="off" tabindex="8" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Stock & Pricing -->
+            <div class="form-section">
+              <h3 class="form-section-title">Stock & Pricing</h3>
+              <div class="form-grid two-col">
+                <div class="form-group">
+                  <label for="stockInput">Current Stock <span class="required-indicator">*</span></label>
+                  <input id="stockInput" name="stock" type="number" min="0" required autocomplete="off" tabindex="9" placeholder="0" />
+                </div>
+                <div class="form-group">
+                  <label for="minStockInput">Minimum Stock <span class="required-indicator">*</span></label>
+                  <input id="minStockInput" name="minimumStock" type="number" min="0" required autocomplete="off" tabindex="10" placeholder="0" />
+                </div>
+                <div class="form-group">
+                  <label for="costInput">Unit Cost <span class="small-muted">(optional)</span></label>
+                  <input id="costInput" name="unitCost" type="number" min="0" step="0.01" autocomplete="off" tabindex="11" placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Product Image -->
+            <div class="form-section">
+              <h3 class="form-section-title">Product Image</h3>
+              <div class="form-group image-field-group">
+                <label for="imageUrlInput">Product Image URL <span class="small-muted">(optional)</span></label>
+                <div class="image-input-control">
+                  <input id="imageUrlInput" name="imageUrl" type="url" placeholder="Paste a direct image URL" autocomplete="off" tabindex="12" />
+                  <button type="button" id="removeImageBtn" class="btn btn-secondary btn-sm hidden">Remove Image</button>
+                </div>
+                <p class="field-hint">Optional. Use a direct image URL ending in .jpg, .jpeg, .png, .webp, etc.</p>
+                <p class="field-hint field-hint-recommendation">Need an image URL? Upload your product image to a supported image host (e.g. Cloudinary, Firebase Storage, ImgBB) and paste the direct image URL here.</p>
+
+                <div id="imagePreviewContainer" class="image-preview-wrapper hidden">
+                  <span class="preview-title" id="previewTitle">Preview</span>
+                  <div id="imagePreviewBox" class="image-preview-box"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Description & Notes -->
+            <div class="form-section">
+              <h3 class="form-section-title">Description & Notes</h3>
+              <div class="form-group">
+                <label for="descriptionInput">Description <span class="small-muted">(optional)</span></label>
+                <textarea id="descriptionInput" name="description" autocomplete="off" tabindex="13" placeholder="Additional product notes, specifications, or details..."></textarea>
+              </div>
+            </div>
           </div>
-          <div class="form-actions">
-            <button type="button" class="btn btn-secondary" data-close-modal="itemModal">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Item</button>
+          <div class="modal-footer form-actions">
+            <button type="button" class="btn btn-secondary" data-close-modal="itemModal" tabindex="15">Cancel</button>
+            <button type="submit" id="submitInventoryBtn" class="btn btn-primary" tabindex="14">Add Item</button>
           </div>
         </form>
       </div>

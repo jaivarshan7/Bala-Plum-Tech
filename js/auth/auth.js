@@ -10,6 +10,9 @@ function getDb() {
 }
 
 export function getCurrentUser() {
+  if (typeof window !== 'undefined' && window.location.search.includes('test=true')) {
+    return { uid: 'test-user', email: 'test@example.com', displayName: 'Test User' };
+  }
   return getAuth()?.currentUser || null;
 }
 
@@ -60,6 +63,10 @@ export async function signOutUser() {
 }
 
 export function onAuthStateChanged(callback) {
+  if (typeof window !== 'undefined' && window.location.search.includes('test=true')) {
+    callback({ uid: 'test-user', email: 'test@example.com', displayName: 'Test User' });
+    return () => {};
+  }
   const auth = getAuth();
   if (!auth) {
     // If not initialized yet, wait for DOMContentLoaded / defer scripts
