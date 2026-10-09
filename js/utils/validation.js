@@ -2,6 +2,25 @@ export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+export function isValidImageUrl(url) {
+  if (!url || typeof url !== 'string') return true;
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+
+  // Reject unsafe inline schemes
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('data:') || lower.startsWith('javascript:') || lower.startsWith('vbscript:')) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function validateInventoryInput(data) {
   const requiredFields = ['name', 'category', 'subcategory', 'unit'];
 
@@ -21,8 +40,13 @@ export function validateInventoryInput(data) {
 
   if (data.imageUrl && typeof data.imageUrl === 'string') {
     const trimmed = data.imageUrl.trim();
-    if (trimmed.startsWith('data:')) {
-      return 'Base64 image data is not allowed. Please provide a direct image URL.';
+    if (trimmed) {
+      if (trimmed.startsWith('data:')) {
+        return 'Base64 image data is not allowed. Please provide a direct image URL.';
+      }
+      if (!isValidImageUrl(trimmed)) {
+        return 'Image URL must use http or https protocol (e.g. https://example.com/image.jpg).';
+      }
     }
   }
 

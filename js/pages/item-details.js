@@ -3,6 +3,7 @@ import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getItemById, getInventoryStatus, updateInventoryItem } from '../services/inventory-service.js';
 import { getTransactionsForItem, createTransaction } from '../services/transaction-service.js';
 import { formatDate, escapeHtml } from '../utils/helpers.js';
+import { isValidImageUrl } from '../utils/validation.js';
 
 const { db } = getFirebaseServices();
 const urlParams = new URLSearchParams(window.location.search);
@@ -64,7 +65,7 @@ async function loadItemDetails() {
 
     const status = getInventoryStatus(item);
     const currentStock = Number(item.stock ?? item.quantity ?? 0);
-    const hasImage = Boolean(item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim());
+    const hasImage = Boolean(item.imageUrl && typeof item.imageUrl === 'string' && isValidImageUrl(item.imageUrl) && item.imageUrl.trim());
     const safeImageUrl = hasImage ? escapeHtml(item.imageUrl.trim()) : '';
     const safeItemName = escapeHtml(item.name || 'Product');
 

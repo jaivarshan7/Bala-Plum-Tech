@@ -1,4 +1,5 @@
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
+import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from '../services/user-service.js';
 import { getInventoryItems, createInventoryItemsBatch } from '../services/inventory-service.js';
 import { DEFAULT_CATEGORIES, PLUMBING_CATEGORIES, UNITS } from '../utils/constants.js';
 import { escapeHtml } from '../utils/helpers.js';
@@ -1313,16 +1314,23 @@ function setupEventListeners() {
 }
 
 // Authentication Guard
-onAuthStateChanged((user) => {
+onAuthStateChanged(async (user) => {
   if (!user) {
-    if (window.location.search.includes('test=true')) {
-      initPage({ uid: 'test-user', email: 'test@example.com' });
-      setupEventListeners();
-      return;
-    }
     window.location.href = './login.html';
     return;
   }
-  initPage(user);
-  setupEventListeners();
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (!profile || profile.active === false || (profile.role !== 'OWNER' && profile.role !== 'EMPLOYEE')) {
+      console.warn('Access denied: active employee or owner account required.');
+      try { await signOutUser(); } catch (e) {}
+      window.location.href = './login.html';
+      return;
+    }
+    initPage(user);
+    setupEventListeners();
+  } catch (err) {
+    console.error('Authentication verification failed:', err);
+    window.location.href = './login.html';
+  }
 });

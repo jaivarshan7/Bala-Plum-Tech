@@ -43,3 +43,49 @@ export function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+export function showToast(message, type = 'success', duration = 4000) {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+export function showAppLoader(text = 'Loading Bala Plumb Tech...') {
+  let loader = document.getElementById('appLoader');
+  if (!loader) {
+    loader = document.createElement('div');
+    loader.id = 'appLoader';
+    loader.className = 'app-loader-overlay';
+    loader.innerHTML = `
+      <div class="app-loader-spinner" aria-hidden="true"></div>
+      <div class="app-loader-brand">Bala Plumb Tech</div>
+      <div class="app-loader-text">${escapeHtml(text)}</div>
+    `;
+    document.body.prepend(loader);
+  }
+}
+
+export function hideAppLoader() {
+  const loader = document.getElementById('appLoader');
+  if (loader) {
+    loader.classList.add('fade-out');
+    setTimeout(() => {
+      if (loader.parentNode) loader.remove();
+    }, 280);
+  }
+}

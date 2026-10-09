@@ -40,6 +40,9 @@
           <div class="form-group">
             <input id="password" name="password" type="password" autocomplete="current-password" required />
           </div>
+          <div style="display: flex; justify-content: flex-end; margin: -6px 0 16px;">
+            <button type="button" id="forgotPasswordBtn" class="text-button" style="font-size: 0.88rem;">Forgot Password?</button>
+          </div>
 
           <button id="loginButton" type="submit" class="btn btn-primary btn-block">
             <span class="button-text">Login</span>
@@ -53,6 +56,35 @@
           </button>
 
           <p id="loginError" class="form-error hidden" role="alert"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="forgotPasswordModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="forgotPasswordTitle">
+      <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-header">
+          <h2 id="forgotPasswordTitle">Reset Password</h2>
+          <button class="close-button" data-close-modal="forgotPasswordModal" type="button" aria-label="Close modal">×</button>
+        </div>
+        <form id="forgotPasswordForm" class="stack-form modal-form">
+          <div class="modal-body modal-form-body">
+            <p class="field-hint" style="margin-bottom: 14px; font-size: 0.92rem; color: var(--text-secondary);">
+              Enter your registered work email address. We'll send an official Firebase password reset link to your inbox.
+            </p>
+            <div class="form-group">
+              <label for="resetEmailInput">Email Address <span class="required-indicator">*</span></label>
+              <input id="resetEmailInput" name="email" type="email" autocomplete="email" required placeholder="e.g. employee@company.com" />
+            </div>
+            <p id="resetMessage" class="hidden" role="alert" style="margin-top: 10px; padding: 10px; border-radius: 8px; font-size: 0.9rem; line-height: 1.4;"></p>
+            <div style="margin-top: 14px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 0.84rem; color: var(--text-secondary); border: 1px solid var(--border);">
+              ℹ️ <strong>Google Sign-In:</strong> If your account was registered using Google, please use the "Continue with Google" button to log in.
+            </div>
+          </div>
+          <div class="modal-footer form-actions">
+            <button type="button" class="btn btn-secondary" data-close-modal="forgotPasswordModal">Cancel</button>
+            <button type="submit" id="sendResetLinkBtn" class="btn btn-primary">Send Reset Link</button>
+          </div>
         </form>
       </div>
     </div>

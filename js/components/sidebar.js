@@ -50,7 +50,6 @@ export async function renderSidebar() {
 
 onAuthStateChanged((user) => {
   if (!user) {
-    if (window.location.search.includes('test=true')) return;
     window.location.href = './login.html';
     return;
   }

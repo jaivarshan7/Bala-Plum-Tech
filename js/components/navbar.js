@@ -1,6 +1,6 @@
 import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
 import { getFirebaseServices } from '../firebase/firebase-config.js';
-import { getInitials } from '../utils/helpers.js';
+import { getInitials, hideAppLoader } from '../utils/helpers.js';
 import { getNotificationsForUser, markAllNotificationsAsRead, markNotificationAsRead } from '../services/notification-service.js';
 import { getCurrentUserProfile, clearUserProfileCache } from '../services/user-service.js';
 
@@ -205,9 +205,10 @@ function setupTopbarListeners(user, displayName, role, unreadCount) {
 
 onAuthStateChanged((user) => {
   if (!user) {
-    if (window.location.search.includes('test=true')) return;
     window.location.href = './login.html';
     return;
   }
-  renderTopbar().catch((error) => console.error('Unable to render topbar:', error));
+  renderTopbar()
+    .catch((error) => console.error('Unable to render topbar:', error))
+    .finally(() => hideAppLoader());
 });

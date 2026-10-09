@@ -10,9 +10,6 @@ function getDb() {
 }
 
 export function getCurrentUser() {
-  if (typeof window !== 'undefined' && window.location.search.includes('test=true')) {
-    return { uid: 'test-user', email: 'test@example.com', displayName: 'Test User' };
-  }
   return getAuth()?.currentUser || null;
 }
 
@@ -21,7 +18,9 @@ export async function signInWithEmail(email, password) {
   if (!auth) {
     throw new Error('Firebase is not configured yet. Update js/firebase/firebase-config.js with your project settings.');
   }
-  return auth.signInWithEmailAndPassword(email, password);
+  const credential = await auth.signInWithEmailAndPassword(email, password);
+  await verifyActiveProfile(credential.user);
+  return credential;
 }
 
 export async function signInWithGoogle() {
@@ -32,11 +31,11 @@ export async function signInWithGoogle() {
 
   const provider = new window.firebase.auth.GoogleAuthProvider();
   const result = await auth.signInWithPopup(provider);
-  await ensureUserProfile(result.user);
+  await verifyActiveProfile(result.user);
   return result.user;
 }
 
-async function ensureUserProfile(user) {
+async function verifyActiveProfile(user) {
   const db = getDb();
   if (!db || !user) return;
 
@@ -44,16 +43,18 @@ async function ensureUserProfile(user) {
   const profile = await profileRef.get();
 
   if (!profile.exists) {
-    await profileRef.set({
-      uid: user.uid,
-      fullName: user.displayName || user.email?.split('@')[0] || 'Employee',
-      email: user.email || '',
-      role: 'EMPLOYEE',
-      avatarUrl: user.photoURL || '',
-      active: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
+    const auth = getAuth();
+    if (auth) await auth.signOut();
+    clearUserProfileCache();
+    throw new Error('Access denied: No registered account found for this user. Please contact the business owner.');
+  }
+
+  const profileData = profile.data();
+  if (profileData?.active === false) {
+    const auth = getAuth();
+    if (auth) await auth.signOut();
+    clearUserProfileCache();
+    throw new Error('Access denied: Your account is inactive. Please contact the business owner.');
   }
 }
 
@@ -63,10 +64,6 @@ export async function signOutUser() {
 }
 
 export function onAuthStateChanged(callback) {
-  if (typeof window !== 'undefined' && window.location.search.includes('test=true')) {
-    callback({ uid: 'test-user', email: 'test@example.com', displayName: 'Test User' });
-    return () => {};
-  }
   const auth = getAuth();
   if (!auth) {
     // If not initialized yet, wait for DOMContentLoaded / defer scripts
@@ -90,4 +87,12 @@ export function requireAuth() {
     return false;
   }
   return true;
+}
+
+export async function sendUserPasswordReset(email) {
+  const auth = getAuth();
+  if (!auth) {
+    throw new Error('Firebase Authentication is not initialized.');
+  }
+  return auth.sendPasswordResetEmail(email.trim());
 }

@@ -1,6 +1,7 @@
 import { getFirebaseServices } from '../firebase/firebase-config.js';
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
-import { formatDate } from '../utils/helpers.js';
+import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from '../services/user-service.js';
+import { formatDate, showAppLoader, hideAppLoader } from '../utils/helpers.js';
 
 const { db } = getFirebaseServices();
 const transactionTypeFilter = document.getElementById('transactionTypeFilter');
@@ -95,10 +96,23 @@ transactionSearch.addEventListener('input', debounce(renderTransactions, 150));
 transactionTypeFilter.addEventListener('change', renderTransactions);
 transactionDateFilter.addEventListener('change', renderTransactions);
 
-onAuthStateChanged((user) => {
+onAuthStateChanged(async (user) => {
   if (!user) {
     window.location.href = './login.html';
     return;
   }
-  loadTransactions();
+  showAppLoader('Loading transaction history...');
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (!profile || profile.active === false) {
+      try { await signOutUser(); } catch (e) {}
+      window.location.href = './login.html';
+      return;
+    }
+    await loadTransactions();
+  } catch (err) {
+    console.error('Transactions load error:', err);
+  } finally {
+    hideAppLoader();
+  }
 });

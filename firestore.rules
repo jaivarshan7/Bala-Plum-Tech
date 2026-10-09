@@ -1,43 +1,114 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    // A user is active only if their profile document exists and active is true
+    function isActiveUser() {
+      return signedIn() && userDocExists() && getUserData().active == true;
+    }
+
     function isOwner() {
-      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'OWNER';
+      return isActiveUser() && getUserData().role == 'OWNER';
     }
 
     function isEmployee() {
-      return signedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'EMPLOYEE';
+      return isActiveUser() && getUserData().role == 'EMPLOYEE';
     }
 
+    function isStaff() {
+      return isOwner() || isEmployee();
+    }
+
+    // Validation helpers for inventory items
+    function isValidInventoryItem(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.category is string && data.category.size() > 0
+        && (!('unit' in data) || (data.unit is string && data.unit.size() > 0))
+        && (!('stock' in data) || (data.stock is number && data.stock >= 0))
+        && (!('quantity' in data) || (data.quantity is number && data.quantity >= 0))
+        && (!('minimumStock' in data) || (data.minimumStock is number && data.minimumStock >= 0))
+        && (!('minimumQuantity' in data) || (data.minimumQuantity is number && data.minimumQuantity >= 0))
+        && (!('unitCost' in data) || (data.unitCost is number && data.unitCost >= 0))
+        && (!('imageUrl' in data) || (data.imageUrl is string && (data.imageUrl == '' || data.imageUrl.matches('^https?://.*'))))
+        && (!('active' in data) || data.active is bool);
+    }
+
+    // Validation helpers for inventory transactions
+    function isValidTransaction(data) {
+      return data.userId == request.auth.uid
+        && data.itemId is string && data.itemId.size() > 0
+        && data.itemName is string && data.itemName.size() > 0
+        && data.type in ['STOCK_IN', 'STOCK_OUT']
+        && data.quantity is number && data.quantity > 0;
+    }
+
+    // Users Collection
     match /users/{userId} {
       allow read: if signedIn() && (userId == request.auth.uid || isOwner());
-      allow create: if signedIn() && (userId == request.auth.uid || isOwner());
-      allow update: if signedIn() && (userId == request.auth.uid || isOwner());
+
+      // Profile creation:
+      // Restricted strictly to active Owners (owner-managed employee access)
+      allow create: if isOwner()
+        && request.resource.data.uid == userId
+        && request.resource.data.role in ['EMPLOYEE', 'OWNER']
+        && request.resource.data.active is bool;
+
+      // Profile update:
+      // - Owners can update any user profile (e.g. status, role)
+      // - Non-owners can only update their own profile and CANNOT modify role, active status, uid, email, or createdAt
+      allow update: if signedIn() && (
+        isOwner()
+        ||
+        (isActiveUser() && userId == request.auth.uid
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.active == resource.data.active
+          && (!('email' in resource.data) || request.resource.data.email == resource.data.email)
+          && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt))
+      );
+
       allow delete: if false;
     }
 
+    // Inventory Collection
     match /inventory/{itemId} {
-      allow read: if signedIn();
-      allow create: if signedIn() && (isOwner() || isEmployee());
-      allow update: if signedIn() && (isOwner() || isEmployee());
-      allow delete: if false;
+      // Legitimate queries by active staff (Owner or Employee)
+      allow read: if isStaff();
+      allow create: if isStaff() && isValidInventoryItem(request.resource.data) && request.resource.data.active == true;
+      allow update: if isStaff() && isValidInventoryItem(request.resource.data);
+      // Destructive deletes restricted to active owners only
+      allow delete: if isOwner();
     }
 
+    // Inventory Transactions (Immutable Audit Log)
     match /inventoryTransactions/{transactionId} {
-      allow read: if signedIn() && (isOwner() || isEmployee() || resource.data.userId == request.auth.uid);
-      allow create: if signedIn() && (isOwner() || isEmployee());
+      allow read: if isStaff();
+      allow create: if isStaff() && isValidTransaction(request.resource.data);
       allow update: if false;
       allow delete: if false;
     }
 
+    // Notifications Collection
     match /notifications/{notificationId} {
       allow read: if signedIn() && (resource.data.userId == request.auth.uid || isOwner());
-      allow create: if signedIn() && (isOwner() || isEmployee());
-      allow update: if signedIn() && (resource.data.userId == request.auth.uid || isOwner());
+      allow create: if isStaff() && request.resource.data.userId is string && request.resource.data.title is string;
+      // Allow users to mark notifications as read without modifying other fields
+      allow update: if signedIn() && (resource.data.userId == request.auth.uid || isOwner())
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.title == resource.data.title
+        && request.resource.data.isRead is bool;
       allow delete: if false;
     }
   }

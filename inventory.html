@@ -204,6 +204,53 @@
       </div>
     </div>
 
+    <!-- Stock In / Stock Out Modal -->
+    <div id="stockModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="stockModalTitle">
+      <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+          <h2 id="stockModalTitle">Stock Adjustment</h2>
+          <button class="close-button" data-close-modal="stockModal" type="button" aria-label="Close modal">×</button>
+        </div>
+        <form id="stockForm" class="stack-form modal-form" autocomplete="off">
+          <input type="hidden" id="stockItemId" name="itemId" />
+          <input type="hidden" id="stockTransactionType" name="type" value="STOCK_IN" />
+
+          <div class="modal-body modal-form-body">
+            <div class="stock-item-summary panel" style="background: var(--background); padding: 14px; border-radius: 10px; margin-bottom: 16px;">
+              <div style="font-weight: 600; font-size: 1.05rem;" id="stockItemName">—</div>
+              <div class="small-muted" style="margin-top: 4px; display: flex; gap: 16px; flex-wrap: wrap;">
+                <span>SKU: <strong id="stockItemSku">—</strong></span>
+                <span>Current Stock: <strong id="stockCurrentQuantity">0</strong> <span id="stockItemUnit">pcs</span></span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="stockQuantityInput" id="stockQuantityLabel">Quantity to Add <span class="required-indicator">*</span></label>
+              <input id="stockQuantityInput" name="quantity" type="number" min="1" step="1" required autocomplete="off" placeholder="Enter quantity" />
+              <p class="field-hint" id="stockQuantityHint">Enter the number of units to add to stock.</p>
+            </div>
+
+            <div class="form-group">
+              <label for="stockReasonInput">Reason / Reference <span class="small-muted">(optional)</span></label>
+              <input id="stockReasonInput" name="reason" placeholder="e.g. Supplier delivery, PO #123, Job return" autocomplete="off" />
+            </div>
+
+            <div class="form-group">
+              <label for="stockNotesInput">Notes <span class="small-muted">(optional)</span></label>
+              <textarea id="stockNotesInput" name="notes" placeholder="Additional details..." rows="2" autocomplete="off"></textarea>
+            </div>
+
+            <p id="stockFormError" class="form-error hidden" role="alert" style="margin-top: 8px;"></p>
+          </div>
+
+          <div class="modal-footer form-actions">
+            <button type="button" class="btn btn-secondary" data-close-modal="stockModal">Cancel</button>
+            <button type="submit" id="submitStockBtn" class="btn btn-primary">Confirm Stock In</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script type="module" src="./js/components/sidebar.js"></script>
     <script type="module" src="./js/components/navbar.js"></script>
   </body>

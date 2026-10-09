@@ -1,5 +1,7 @@
 import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getStatusFromQuantity } from '../utils/helpers.js';
+import { getCurrentUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from './user-service.js';
 
 const { db } = getFirebaseServices();
 
@@ -47,8 +49,14 @@ export async function getItemById(itemId) {
 }
 
 export async function createInventoryItem(itemData) {
+  let cleanImageUrl = String(itemData.imageUrl || '').trim();
+  if (cleanImageUrl && !cleanImageUrl.startsWith('http://') && !cleanImageUrl.startsWith('https://')) {
+    cleanImageUrl = '';
+  }
+
   const payload = {
     ...itemData,
+    imageUrl: cleanImageUrl,
     active: true,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -97,7 +105,7 @@ export async function createInventoryItemsBatch(items, onProgress = null) {
         size: String(item.size || '').trim(),
         description: String(item.description || '').trim(),
         storageLocation: String(item.storageLocation || '').trim(),
-        imageUrl: String(item.imageUrl || '').trim(),
+        imageUrl: (String(item.imageUrl || '').trim().startsWith('http://') || String(item.imageUrl || '').trim().startsWith('https://')) ? String(item.imageUrl || '').trim() : '',
         stock: Number(item.stock ?? item.quantity ?? 0),
         minimumStock: Number(item.minimumStock ?? item.minimumQuantity ?? 0),
         quantity: Number(item.stock ?? item.quantity ?? 0),
@@ -143,8 +151,13 @@ export async function createInventoryItemsBatch(items, onProgress = null) {
 }
 
 export async function updateInventoryItem(itemId, itemData) {
+  const sanitized = { ...itemData };
+  if ('imageUrl' in sanitized) {
+    const cleanImageUrl = String(sanitized.imageUrl || '').trim();
+    sanitized.imageUrl = (cleanImageUrl.startsWith('http://') || cleanImageUrl.startsWith('https://')) ? cleanImageUrl : '';
+  }
   await db.collection('inventory').doc(itemId).update({
-    ...itemData,
+    ...sanitized,
     updatedAt: new Date()
   });
   invalidateInventoryCache();
@@ -164,4 +177,106 @@ export function getInventoryStatus(item) {
   if (status === 'in-stock') return { label: 'In Stock', className: 'in-stock' };
   if (status === 'low-stock') return { label: 'Low Stock', className: 'low-stock' };
   return { label: 'Out of Stock', className: 'out-of-stock' };
+}
+
+/**
+ * Concurrency-safe atomic stock adjustment (Stock In / Stock Out).
+ * Ensures that item stock and audit transaction records are updated in a single atomic transaction.
+ */
+export async function adjustInventoryStock({ itemId, type, quantity, reason = '', notes = '' }) {
+  if (!itemId) {
+    throw new Error('Item ID is required for stock adjustment.');
+  }
+  if (!['STOCK_IN', 'STOCK_OUT'].includes(type)) {
+    throw new Error('Transaction type must be STOCK_IN or STOCK_OUT.');
+  }
+
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    throw new Error('Quantity must be a positive number greater than zero.');
+  }
+
+  const user = getCurrentUser();
+  if (!user) {
+    throw new Error('Authentication required to perform stock adjustments.');
+  }
+
+  let employeeName = user.displayName || user.email || 'Staff';
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (profile?.fullName) {
+      employeeName = profile.fullName;
+    }
+  } catch (profileErr) {
+    console.warn('Could not fetch employee profile for transaction:', profileErr);
+  }
+
+  const itemRef = db.collection('inventory').doc(itemId);
+  const txRef = db.collection('inventoryTransactions').doc();
+
+  const txRecord = await db.runTransaction(async (transaction) => {
+    const itemSnap = await transaction.get(itemRef);
+    if (!itemSnap.exists) {
+      throw new Error('Inventory item was not found.');
+    }
+
+    const itemData = itemSnap.data();
+    const currentStock = Number(itemData.stock ?? itemData.quantity ?? 0);
+    let newStock;
+
+    if (type === 'STOCK_IN') {
+      newStock = currentStock + qty;
+    } else {
+      if (currentStock < qty) {
+        throw new Error(`Insufficient stock. Available stock is ${currentStock}, requested removal is ${qty}.`);
+      }
+      newStock = currentStock - qty;
+    }
+
+    // Atomic update to inventory item
+    transaction.update(itemRef, {
+      stock: newStock,
+      quantity: newStock,
+      updatedAt: new Date()
+    });
+
+    // Atomic insert of audit transaction log
+    const auditRecord = {
+      itemId,
+      itemName: String(itemData.name || 'Unnamed Item').trim(),
+      userId: user.uid,
+      employeeName,
+      type,
+      quantity: qty,
+      previousQuantity: currentStock,
+      newQuantity: newStock,
+      reason: String(reason || '').trim(),
+      notes: String(notes || '').trim(),
+      createdAt: new Date()
+    };
+
+    transaction.set(txRef, auditRecord);
+
+    return {
+      id: txRef.id,
+      ...auditRecord,
+      item: {
+        id: itemId,
+        ...itemData,
+        stock: newStock,
+        quantity: newStock
+      }
+    };
+  });
+
+  invalidateInventoryCache();
+  return txRecord;
+}
+
+export async function stockInItem(itemId, quantity, reason = '', notes = '') {
+  return adjustInventoryStock({ itemId, type: 'STOCK_IN', quantity, reason, notes });
+}
+
+export async function stockOutItem(itemId, quantity, reason = '', notes = '') {
+  return adjustInventoryStock({ itemId, type: 'STOCK_OUT', quantity, reason, notes });
 }

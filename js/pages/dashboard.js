@@ -1,7 +1,8 @@
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
+import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from '../services/user-service.js';
 import { getRecentTransactions } from '../services/transaction-service.js';
 import { getInventoryItems } from '../services/inventory-service.js';
-import { formatDate } from '../utils/helpers.js';
+import { formatDate, showAppLoader, hideAppLoader } from '../utils/helpers.js';
 
 function renderDashboardSkeletons() {
   const statIds = ['totalItems', 'totalQuantity', 'lowStockCount', 'recentTransactionsCount'];
@@ -97,10 +98,23 @@ async function loadDashboard() {
   }
 }
 
-onAuthStateChanged((user) => {
+onAuthStateChanged(async (user) => {
   if (!user) {
     window.location.href = './login.html';
     return;
   }
-  loadDashboard();
+  showAppLoader('Loading dashboard overview...');
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (!profile || profile.active === false) {
+      try { await signOutUser(); } catch (e) {}
+      window.location.href = './login.html';
+      return;
+    }
+    await loadDashboard();
+  } catch (err) {
+    console.error('Dashboard auth/load error:', err);
+  } finally {
+    hideAppLoader();
+  }
 });

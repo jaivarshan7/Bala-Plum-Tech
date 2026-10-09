@@ -1,9 +1,10 @@
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
+import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
+import { getCurrentUserProfile } from '../services/user-service.js';
 import { getFirebaseServices } from '../firebase/firebase-config.js';
-import { getInventoryItems, getInventoryStatus, createInventoryItem, updateInventoryItem } from '../services/inventory-service.js';
+import { getInventoryItems, getInventoryStatus, createInventoryItem, updateInventoryItem, adjustInventoryStock } from '../services/inventory-service.js';
 import { DEFAULT_CATEGORIES, PLUMBING_CATEGORIES, UNITS } from '../utils/constants.js';
-import { validateInventoryInput } from '../utils/validation.js';
-import { escapeHtml } from '../utils/helpers.js';
+import { validateInventoryInput, isValidImageUrl } from '../utils/validation.js';
+import { escapeHtml, showToast, showAppLoader, hideAppLoader } from '../utils/helpers.js';
 
 const { db } = getFirebaseServices();
 const inventoryTableBody = document.getElementById('inventoryTableBody');
@@ -273,7 +274,7 @@ function getFilteredInventory() {
 }
 
 function renderItemThumbnail(item) {
-  const imageUrl = item.imageUrl && typeof item.imageUrl === 'string' ? item.imageUrl.trim() : '';
+  const imageUrl = item.imageUrl && typeof item.imageUrl === 'string' && isValidImageUrl(item.imageUrl) ? item.imageUrl.trim() : '';
   if (!imageUrl) {
     return '<div class="item-thumb-placeholder" title="No image" aria-label="No image">—</div>';
   }
@@ -348,6 +349,7 @@ function renderInventoryTable() {
             <a href="./item-details.html?id=${item.id}" class="btn btn-secondary">View</a>
             <button class="btn btn-secondary" data-edit-item="${item.id}">Edit</button>
             <button class="btn btn-primary" data-stock-in="${item.id}">Stock In</button>
+            <button class="btn btn-secondary" data-stock-out="${item.id}">Stock Out</button>
           </div>
         </td>
       </tr>
@@ -390,39 +392,19 @@ async function loadInventoryPage(user) {
     inventoryData = await getInventoryItems();
   } catch (error) {
     console.error('Unable to load inventory:', error);
-    if (window.location.search.includes('test=true')) {
-      inventoryData = [
-        { id: '1', name: 'PVC Pipe 1 inch', sku: 'PIPE-001', category: 'Pipes', subcategory: 'PVC', brand: 'Supreme', size: '1 inch', stock: 50, minimumStock: 10, unit: 'm', imageUrl: '' },
-        { id: '2', name: 'CPVC Pipe 3/4 inch', sku: 'PIPE-002', category: 'Pipes', subcategory: 'CPVC', brand: 'Astral', size: '3/4 inch', stock: 5, minimumStock: 10, unit: 'm', imageUrl: '' },
-        { id: '3', name: 'PVC Elbow 90 Deg', sku: 'FIT-001', category: 'Pipe Fittings', subcategory: 'Elbow', brand: 'Supreme', size: '1 inch', stock: 100, minimumStock: 20, unit: 'pcs', imageUrl: '' },
-        { id: '4', name: 'PVC Tee Equal', sku: 'FIT-002', category: 'Pipe Fittings', subcategory: 'Tee', brand: 'Finolex', size: '1 inch', stock: 0, minimumStock: 10, unit: 'pcs', imageUrl: '' },
-        { id: '5', name: 'Ball Valve 1 inch', sku: 'VAL-001', category: 'Valves', subcategory: 'Ball Valve', brand: 'Zoloto', size: '1 inch', stock: 25, minimumStock: 5, unit: 'pcs', imageUrl: '' }
-      ];
-    } else {
-      inventoryData = [];
-      inventoryTableBody.innerHTML = `
-        <tr>
-          <td colspan="10">
-            <div class="empty-state">
-              <p>Unable to load inventory. Please check your network connection.</p>
-              <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
-            </div>
-          </td>
-        </tr>
-      `;
-      document.getElementById('retryInventoryBtn')?.addEventListener('click', () => loadInventoryPage(user));
-      return;
-    }
-  }
-
-  if (window.location.search.includes('test=true') && (!inventoryData || inventoryData.length === 0)) {
-    inventoryData = [
-      { id: '1', name: 'PVC Pipe 1 inch', sku: 'PIPE-001', category: 'Pipes', subcategory: 'PVC', brand: 'Supreme', size: '1 inch', stock: 50, minimumStock: 10, unit: 'm', imageUrl: '' },
-      { id: '2', name: 'CPVC Pipe 3/4 inch', sku: 'PIPE-002', category: 'Pipes', subcategory: 'CPVC', brand: 'Astral', size: '3/4 inch', stock: 5, minimumStock: 10, unit: 'm', imageUrl: '' },
-      { id: '3', name: 'PVC Elbow 90 Deg', sku: 'FIT-001', category: 'Pipe Fittings', subcategory: 'Elbow', brand: 'Supreme', size: '1 inch', stock: 100, minimumStock: 20, unit: 'pcs', imageUrl: '' },
-      { id: '4', name: 'PVC Tee Equal', sku: 'FIT-002', category: 'Pipe Fittings', subcategory: 'Tee', brand: 'Finolex', size: '1 inch', stock: 0, minimumStock: 10, unit: 'pcs', imageUrl: '' },
-      { id: '5', name: 'Ball Valve 1 inch', sku: 'VAL-001', category: 'Valves', subcategory: 'Ball Valve', brand: 'Zoloto', size: '1 inch', stock: 25, minimumStock: 5, unit: 'pcs', imageUrl: '' }
-    ];
+    inventoryData = [];
+    inventoryTableBody.innerHTML = `
+      <tr>
+        <td colspan="10">
+          <div class="empty-state">
+            <p>Unable to load inventory. Please check your network connection.</p>
+            <button id="retryInventoryBtn" class="btn btn-secondary" style="margin-top: 8px;">Try Again</button>
+          </div>
+        </td>
+      </tr>
+    `;
+    document.getElementById('retryInventoryBtn')?.addEventListener('click', () => loadInventoryPage(user));
+    return;
   }
 
   renderCategoryOptions();
@@ -474,30 +456,170 @@ addItemButton.addEventListener('click', () => {
 
 inventoryTableBody.addEventListener('click', (event) => {
   const editButton = event.target.closest('[data-edit-item]');
-  if (!editButton) return;
-  const item = inventoryData.find((record) => record.id === editButton.dataset.editItem);
-  if (!item) return;
-  editingItemId = item.id;
-  document.getElementById('itemModalTitle').textContent = 'Edit Inventory Item';
-  const submitButton = inventoryForm.querySelector('button[type="submit"]');
-  if (submitButton) submitButton.textContent = 'Save Changes';
-  Object.entries({
-    name: item.name || '', sku: item.sku || '', category: item.category || '', subcategory: item.subcategory || '',
-    unit: item.unit || '', size: item.size || '', stock: getStock(item),
-    minimumStock: Number(item.minimumStock ?? item.minimumQuantity ?? 0), unitCost: item.unitCost ?? '', storageLocation: item.storageLocation || '', description: item.description || ''
-  }).forEach(([field, value]) => { if (inventoryForm.elements[field]) inventoryForm.elements[field].value = value; });
-  if (imageUrlInput) {
-    imageUrlInput.value = item.imageUrl || '';
-    handleImageUrlChange(item.imageUrl || '');
+  if (editButton) {
+    const item = inventoryData.find((record) => record.id === editButton.dataset.editItem);
+    if (!item) return;
+    editingItemId = item.id;
+    document.getElementById('itemModalTitle').textContent = 'Edit Inventory Item';
+    const submitButton = inventoryForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.textContent = 'Save Changes';
+    Object.entries({
+      name: item.name || '', sku: item.sku || '', category: item.category || '', subcategory: item.subcategory || '',
+      unit: item.unit || '', size: item.size || '', stock: getStock(item),
+      minimumStock: Number(item.minimumStock ?? item.minimumQuantity ?? 0), unitCost: item.unitCost ?? '', storageLocation: item.storageLocation || '', description: item.description || ''
+    }).forEach(([field, value]) => { if (inventoryForm.elements[field]) inventoryForm.elements[field].value = value; });
+    if (imageUrlInput) {
+      imageUrlInput.value = item.imageUrl || '';
+      handleImageUrlChange(item.imageUrl || '');
+    }
+    categorySelect?.setValue(item.category || '', true);
+    updateSubcategoryOptions(item.category || '', item.subcategory || '');
+    if (item.brand && brandSelect) {
+      brandSelect.addOption({ value: item.brand, text: item.brand });
+      brandSelect.setValue(item.brand, true);
+    }
+    itemModal.classList.remove('hidden');
+    itemModal.setAttribute('aria-hidden', 'false');
+    return;
   }
-  categorySelect?.setValue(item.category || '', true);
-  updateSubcategoryOptions(item.category || '', item.subcategory || '');
-  if (item.brand && brandSelect) {
-    brandSelect.addOption({ value: item.brand, text: item.brand });
-    brandSelect.setValue(item.brand, true);
+
+  const stockInButton = event.target.closest('[data-stock-in]');
+  if (stockInButton) {
+    const item = inventoryData.find((record) => record.id === stockInButton.dataset.stockIn);
+    if (item) openStockModal(item, 'STOCK_IN');
+    return;
   }
-  itemModal.classList.remove('hidden');
-  itemModal.setAttribute('aria-hidden', 'false');
+
+  const stockOutButton = event.target.closest('[data-stock-out]');
+  if (stockOutButton) {
+    const item = inventoryData.find((record) => record.id === stockOutButton.dataset.stockOut);
+    if (item) openStockModal(item, 'STOCK_OUT');
+    return;
+  }
+});
+
+function openStockModal(item, type = 'STOCK_IN') {
+  const stockModal = document.getElementById('stockModal');
+  const stockForm = document.getElementById('stockForm');
+  const stockFormError = document.getElementById('stockFormError');
+  const title = document.getElementById('stockModalTitle');
+  const itemName = document.getElementById('stockItemName');
+  const itemSku = document.getElementById('stockItemSku');
+  const currentQty = document.getElementById('stockCurrentQuantity');
+  const itemUnit = document.getElementById('stockItemUnit');
+  const qtyLabel = document.getElementById('stockQuantityLabel');
+  const qtyHint = document.getElementById('stockQuantityHint');
+  const submitBtn = document.getElementById('submitStockBtn');
+
+  if (!stockModal || !stockForm) return;
+
+  stockForm.reset();
+  stockFormError?.classList.add('hidden');
+  if (stockFormError) stockFormError.textContent = '';
+
+  document.getElementById('stockItemId').value = item.id;
+  document.getElementById('stockTransactionType').value = type;
+
+  const currentStock = getStock(item);
+  itemName.textContent = item.name || 'Product';
+  itemSku.textContent = item.sku || '—';
+  currentQty.textContent = String(currentStock);
+  itemUnit.textContent = item.unit || 'pcs';
+
+  if (type === 'STOCK_IN') {
+    title.textContent = `Stock In: ${item.name || 'Product'}`;
+    qtyLabel.innerHTML = 'Quantity to Add <span class="required-indicator">*</span>';
+    qtyHint.textContent = 'Enter the number of units to add to stock.';
+    submitBtn.textContent = 'Confirm Stock In';
+    submitBtn.className = 'btn btn-primary';
+  } else {
+    title.textContent = `Stock Out: ${item.name || 'Product'}`;
+    qtyLabel.innerHTML = 'Quantity to Remove <span class="required-indicator">*</span>';
+    qtyHint.textContent = `Enter the number of units to remove (max: ${currentStock}).`;
+    submitBtn.textContent = 'Confirm Stock Out';
+    submitBtn.className = 'btn btn-danger';
+  }
+
+  stockModal.classList.remove('hidden');
+  stockModal.setAttribute('aria-hidden', 'false');
+  setTimeout(() => document.getElementById('stockQuantityInput')?.focus(), 50);
+}
+
+const stockForm = document.getElementById('stockForm');
+const stockModal = document.getElementById('stockModal');
+
+stockForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formError = document.getElementById('stockFormError');
+  const submitBtn = document.getElementById('submitStockBtn');
+  const itemId = document.getElementById('stockItemId').value;
+  const type = document.getElementById('stockTransactionType').value;
+  const quantityInput = document.getElementById('stockQuantityInput');
+  const reasonInput = document.getElementById('stockReasonInput');
+  const notesInput = document.getElementById('stockNotesInput');
+
+  formError?.classList.add('hidden');
+  if (formError) formError.textContent = '';
+
+  const item = inventoryData.find((r) => r.id === itemId);
+  if (!item) {
+    if (formError) {
+      formError.textContent = 'Item not found in current inventory.';
+      formError.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const qty = Number(quantityInput.value);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    if (formError) {
+      formError.textContent = 'Please enter a valid positive quantity.';
+      formError.classList.remove('hidden');
+    }
+    quantityInput.focus();
+    return;
+  }
+
+  const currentStock = getStock(item);
+  if (type === 'STOCK_OUT' && qty > currentStock) {
+    if (formError) {
+      formError.textContent = `Cannot remove ${qty} units. Only ${currentStock} units available in stock.`;
+      formError.classList.remove('hidden');
+    }
+    quantityInput.focus();
+    return;
+  }
+
+  const originalBtnText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Processing...';
+
+  try {
+    const result = await adjustInventoryStock({
+      itemId,
+      type,
+      quantity: qty,
+      reason: reasonInput.value.trim(),
+      notes: notesInput.value.trim()
+    });
+
+    // Update local item stock
+    item.stock = result.newQuantity;
+    item.quantity = result.newQuantity;
+
+    closeModal('stockModal');
+    renderInventoryTable();
+    showToast(`Successfully recorded ${type === 'STOCK_IN' ? 'Stock In' : 'Stock Out'} of ${qty} units for ${item.name}. (New Stock: ${result.newQuantity})`, 'success');
+  } catch (err) {
+    console.error('Stock adjustment error:', err);
+    if (formError) {
+      formError.textContent = err.message || 'Unable to complete stock adjustment. Please try again.';
+      formError.classList.remove('hidden');
+    }
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalBtnText;
+  }
 });
 
 function closeModal(modalId = 'itemModal') {
@@ -516,14 +638,21 @@ document.querySelectorAll('[data-close-modal]').forEach((button) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !itemModal.classList.contains('hidden')) {
-    closeModal('itemModal');
+  if (event.key === 'Escape') {
+    if (!itemModal.classList.contains('hidden')) closeModal('itemModal');
+    if (stockModal && !stockModal.classList.contains('hidden')) closeModal('stockModal');
   }
 });
 
 itemModal.addEventListener('click', (event) => {
   if (event.target === itemModal) {
     closeModal('itemModal');
+  }
+});
+
+stockModal?.addEventListener('click', (event) => {
+  if (event.target === stockModal) {
+    closeModal('stockModal');
   }
 });
 
@@ -535,7 +664,7 @@ inventoryForm.addEventListener('submit', async (event) => {
 
   const formData = new FormData(inventoryForm);
   const rawImageUrl = String(formData.get('imageUrl') || '').trim();
-  const safeImageUrl = rawImageUrl.startsWith('data:') ? '' : rawImageUrl;
+  const safeImageUrl = isValidImageUrl(rawImageUrl) ? rawImageUrl : '';
 
   const payload = {
     name: String(formData.get('name') || '').trim(),
@@ -591,14 +720,25 @@ inventoryForm.addEventListener('submit', async (event) => {
   }
 });
 
-onAuthStateChanged((user) => {
+onAuthStateChanged(async (user) => {
   if (!user) {
-    if (window.location.search.includes('test=true')) {
-      loadInventoryPage({ uid: 'test-user', email: 'test@example.com' });
-      return;
-    }
     window.location.href = './login.html';
     return;
   }
-  loadInventoryPage(user);
+  showAppLoader('Loading inventory catalog...');
+  try {
+    const profile = await getCurrentUserProfile(user.uid);
+    if (!profile || profile.active === false) {
+      console.warn('Access denied: active account required.');
+      try { await signOutUser(); } catch (e) {}
+      window.location.href = './login.html';
+      return;
+    }
+    await loadInventoryPage(user);
+  } catch (err) {
+    console.error('Inventory auth verification failed:', err);
+    window.location.href = './login.html';
+  } finally {
+    hideAppLoader();
+  }
 });
