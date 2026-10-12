@@ -1,6 +1,7 @@
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
+import { getCurrentUser } from '../auth/auth.js';
 import { getCurrentUserProfile } from '../services/user-service.js';
-import { getInitials } from '../utils/helpers.js';
+import { getInitials, showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 function renderProfileSkeletons() {
   const profileCard = document.getElementById('profileCard');
@@ -68,10 +69,24 @@ async function loadProfile() {
   }
 }
 
-onAuthStateChanged((user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  loadProfile();
-});
+initCoordinator.register('pageData', { required: true, description: 'Profile details' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
+      return;
+    }
+    try {
+      showAppLoader('Loading profile details...');
+      await loadProfile();
+    } catch (err) {
+      console.error('Profile load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Profile initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

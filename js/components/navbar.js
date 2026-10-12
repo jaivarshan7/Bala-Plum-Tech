@@ -1,10 +1,12 @@
 import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
 import { getFirebaseServices } from '../firebase/firebase-config.js';
-import { getInitials, hideAppLoader } from '../utils/helpers.js';
+import { getInitials, initCoordinator } from '../utils/helpers.js';
 import { getNotificationsForUser, markAllNotificationsAsRead, markNotificationAsRead } from '../services/notification-service.js';
 import { getCurrentUserProfile, clearUserProfileCache } from '../services/user-service.js';
 
 const { db } = getFirebaseServices();
+
+initCoordinator.register('navbar', { required: true, description: 'Header navigation' });
 
 let activeNotifications = [];
 
@@ -33,10 +35,16 @@ export async function renderTopbar() {
   }
 
   try {
-    activeNotifications = await getNotificationsForUser(user.uid);
+    initCoordinator.registerOptional('notifications', { description: 'User notifications', timeoutMs: 3000 });
+    activeNotifications = await Promise.race([
+      getNotificationsForUser(user.uid),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Notification fetch timeout')), 3000))
+    ]);
+    initCoordinator.complete('notifications');
   } catch (error) {
     console.error('Unable to load notifications:', error);
     activeNotifications = [];
+    initCoordinator.fail('notifications', error);
   }
 
   const unreadCount = activeNotifications.filter((notification) => !notification.isRead).length;
@@ -203,12 +211,25 @@ function setupTopbarListeners(user, displayName, role, unreadCount) {
   });
 }
 
+let navbarRenderPromise = null;
+
+export async function initNavbar() {
+  if (navbarRenderPromise) return navbarRenderPromise;
+  navbarRenderPromise = renderTopbar()
+    .then(() => {
+      initCoordinator.complete('navbar');
+    })
+    .catch((error) => {
+      console.error('Unable to render topbar:', error);
+      initCoordinator.fail('navbar', error);
+    });
+  return navbarRenderPromise;
+}
+
 onAuthStateChanged((user) => {
   if (!user) {
-    window.location.href = './login.html';
+    initCoordinator.complete('navbar');
     return;
   }
-  renderTopbar()
-    .catch((error) => console.error('Unable to render topbar:', error))
-    .finally(() => hideAppLoader());
+  initNavbar();
 });

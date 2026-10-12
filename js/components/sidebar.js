@@ -1,5 +1,8 @@
 import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
 import { getCurrentUserProfile } from '../services/user-service.js';
+import { initCoordinator } from '../utils/helpers.js';
+
+initCoordinator.register('sidebar', { required: true, description: 'Sidebar navigation' });
 
 export async function renderSidebar() {
   const sidebar = document.getElementById('sidebar');
@@ -48,10 +51,25 @@ export async function renderSidebar() {
   `;
 }
 
+let sidebarRenderPromise = null;
+
+export async function initSidebar() {
+  if (sidebarRenderPromise) return sidebarRenderPromise;
+  sidebarRenderPromise = renderSidebar()
+    .then(() => {
+      initCoordinator.complete('sidebar');
+    })
+    .catch((error) => {
+      console.error('Unable to render sidebar:', error);
+      initCoordinator.fail('sidebar', error);
+    });
+  return sidebarRenderPromise;
+}
+
 onAuthStateChanged((user) => {
   if (!user) {
-    window.location.href = './login.html';
+    initCoordinator.complete('sidebar');
     return;
   }
-  renderSidebar().catch((error) => console.error('Unable to render sidebar:', error));
+  initSidebar();
 });

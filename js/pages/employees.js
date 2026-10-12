@@ -1,7 +1,8 @@
 import { getAllUsers, getCurrentUserProfile, createEmployeeAccount, setEmployeeActiveStatus, setEmployeeRole, sendEmployeePasswordReset } from '../services/user-service.js';
 import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
 import { ROLE_LABELS } from '../utils/constants.js';
-import { formatDate, escapeHtml, showToast, showAppLoader, hideAppLoader } from '../utils/helpers.js';
+import { formatDate, escapeHtml, showToast, showAppLoader, hideAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 let employeesList = [];
 let pendingConfirmAction = null;
@@ -321,23 +322,24 @@ employeeForm?.addEventListener('submit', async (event) => {
   }
 });
 
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  showAppLoader('Verifying owner access...');
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (profile?.role !== 'OWNER' || profile?.active === false) {
-      window.location.href = './dashboard.html';
+initCoordinator.register('pageData', { required: true, description: 'Employee management data' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
       return;
     }
-    await loadEmployees();
-  } catch (error) {
-    console.error('Unable to verify employee-management access:', error);
-    window.location.href = './dashboard.html';
-  } finally {
-    hideAppLoader();
-  }
-});
+    try {
+      showAppLoader('Verifying owner access & loading employees...');
+      await loadEmployees();
+    } catch (error) {
+      console.error('Unable to load employees:', error);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((error) => {
+    console.error('Employees initialization error:', error);
+    initCoordinator.fail('pageData', error);
+  });

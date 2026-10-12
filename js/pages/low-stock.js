@@ -1,5 +1,7 @@
 import { getLowStockItems } from '../services/inventory-service.js';
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
+import { getCurrentUser } from '../auth/auth.js';
+import { showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 function renderLowStockSkeletons() {
   const list = document.getElementById('lowStockList');
@@ -46,10 +48,24 @@ async function loadLowStock() {
   }
 }
 
-onAuthStateChanged((user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  loadLowStock();
-});
+initCoordinator.register('pageData', { required: true, description: 'Low stock alerts' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
+      return;
+    }
+    try {
+      showAppLoader('Loading low stock alerts...');
+      await loadLowStock();
+    } catch (err) {
+      console.error('Low stock load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Low stock initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

@@ -2,7 +2,8 @@ import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js
 import { getCurrentUserProfile } from '../services/user-service.js';
 import { getInventoryItems, createInventoryItemsBatch } from '../services/inventory-service.js';
 import { DEFAULT_CATEGORIES, PLUMBING_CATEGORIES, UNITS } from '../utils/constants.js';
-import { escapeHtml } from '../utils/helpers.js';
+import { escapeHtml, showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 // DOM elements
 const bulkTableBody = document.getElementById('bulkTableBody');
@@ -1313,24 +1314,25 @@ function setupEventListeners() {
   });
 }
 
-// Authentication Guard
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (!profile || profile.active === false || (profile.role !== 'OWNER' && profile.role !== 'EMPLOYEE')) {
-      console.warn('Access denied: active employee or owner account required.');
-      try { await signOutUser(); } catch (e) {}
-      window.location.href = './login.html';
+initCoordinator.register('pageData', { required: true, description: 'Bulk inventory workspace' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
       return;
     }
-    initPage(user);
-    setupEventListeners();
-  } catch (err) {
-    console.error('Authentication verification failed:', err);
-    window.location.href = './login.html';
-  }
-});
+    try {
+      showAppLoader('Loading bulk entry workspace...');
+      await initPage(auth.user);
+      setupEventListeners();
+    } catch (err) {
+      console.error('Bulk inventory load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Bulk inventory initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

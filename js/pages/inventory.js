@@ -4,7 +4,8 @@ import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getInventoryItems, getInventoryStatus, createInventoryItem, updateInventoryItem, adjustInventoryStock } from '../services/inventory-service.js';
 import { DEFAULT_CATEGORIES, PLUMBING_CATEGORIES, UNITS } from '../utils/constants.js';
 import { validateInventoryInput, isValidImageUrl } from '../utils/validation.js';
-import { escapeHtml, showToast, showAppLoader, hideAppLoader } from '../utils/helpers.js';
+import { escapeHtml, showToast, showAppLoader, hideAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 const { db } = getFirebaseServices();
 const inventoryTableBody = document.getElementById('inventoryTableBody');
@@ -720,25 +721,24 @@ inventoryForm.addEventListener('submit', async (event) => {
   }
 });
 
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  showAppLoader('Loading inventory catalog...');
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (!profile || profile.active === false) {
-      console.warn('Access denied: active account required.');
-      try { await signOutUser(); } catch (e) {}
-      window.location.href = './login.html';
+initCoordinator.register('pageData', { required: true, description: 'Inventory catalog data' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
       return;
     }
-    await loadInventoryPage(user);
-  } catch (err) {
-    console.error('Inventory auth verification failed:', err);
-    window.location.href = './login.html';
-  } finally {
-    hideAppLoader();
-  }
-});
+    try {
+      showAppLoader('Loading inventory catalog...');
+      await loadInventoryPage(auth.user);
+    } catch (err) {
+      console.error('Inventory auth verification failed:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Inventory initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

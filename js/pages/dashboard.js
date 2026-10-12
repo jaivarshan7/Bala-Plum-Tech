@@ -1,8 +1,8 @@
-import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
-import { getCurrentUserProfile } from '../services/user-service.js';
+import { getCurrentUser } from '../auth/auth.js';
 import { getRecentTransactions } from '../services/transaction-service.js';
 import { getInventoryItems } from '../services/inventory-service.js';
-import { formatDate, showAppLoader, hideAppLoader } from '../utils/helpers.js';
+import { formatDate, showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 function renderDashboardSkeletons() {
   const statIds = ['totalItems', 'totalQuantity', 'lowStockCount', 'recentTransactionsCount'];
@@ -98,23 +98,24 @@ async function loadDashboard() {
   }
 }
 
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  showAppLoader('Loading dashboard overview...');
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (!profile || profile.active === false) {
-      try { await signOutUser(); } catch (e) {}
-      window.location.href = './login.html';
+initCoordinator.register('pageData', { required: true, description: 'Dashboard overview data' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
       return;
     }
-    await loadDashboard();
-  } catch (err) {
-    console.error('Dashboard auth/load error:', err);
-  } finally {
-    hideAppLoader();
-  }
-});
+    try {
+      showAppLoader('Loading dashboard overview...');
+      await loadDashboard();
+    } catch (err) {
+      console.error('Dashboard load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Dashboard initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

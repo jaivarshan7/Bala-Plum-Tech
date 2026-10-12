@@ -2,7 +2,8 @@ import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
 import { getFirebaseServices } from '../firebase/firebase-config.js';
 import { getItemById, getInventoryStatus, updateInventoryItem } from '../services/inventory-service.js';
 import { getTransactionsForItem, createTransaction } from '../services/transaction-service.js';
-import { formatDate, escapeHtml } from '../utils/helpers.js';
+import { formatDate, escapeHtml, showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 import { isValidImageUrl } from '../utils/validation.js';
 
 const { db } = getFirebaseServices();
@@ -147,10 +148,24 @@ async function loadItemDetails() {
   }
 }
 
-onAuthStateChanged((user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  loadItemDetails();
-});
+initCoordinator.register('pageData', { required: true, description: 'Item specifications' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
+      return;
+    }
+    try {
+      showAppLoader('Loading item specifications...');
+      await loadItemDetails();
+    } catch (err) {
+      console.error('Item details load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Item details initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

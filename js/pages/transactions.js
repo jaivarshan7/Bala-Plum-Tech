@@ -1,7 +1,7 @@
 import { getFirebaseServices } from '../firebase/firebase-config.js';
-import { getCurrentUser, onAuthStateChanged, signOutUser } from '../auth/auth.js';
-import { getCurrentUserProfile } from '../services/user-service.js';
-import { formatDate, showAppLoader, hideAppLoader } from '../utils/helpers.js';
+import { getCurrentUser } from '../auth/auth.js';
+import { formatDate, showAppLoader, initCoordinator } from '../utils/helpers.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
 const { db } = getFirebaseServices();
 const transactionTypeFilter = document.getElementById('transactionTypeFilter');
@@ -81,12 +81,12 @@ function renderTransactions() {
   transactionTableBody.innerHTML = filtered.map((tx) => `
     <tr>
       <td>${formatDate(tx.createdAt)}</td>
-      <td>${tx.itemName}</td>
-      <td>${tx.type}</td>
+      <td><a href="./item-details.html?id=${tx.itemId}"><strong>${tx.itemName}</strong></a></td>
+      <td><span class="chip ${tx.type === 'STOCK_IN' ? 'primary' : 'warning'}">${tx.type === 'STOCK_IN' ? 'Stock In' : 'Stock Out'}</span></td>
       <td>${tx.quantity}</td>
-      <td>${tx.previousQuantity}</td>
-      <td>${tx.newQuantity}</td>
-      <td>${tx.employeeName}</td>
+      <td>${tx.previousStock ?? '—'}</td>
+      <td>${tx.newStock ?? '—'}</td>
+      <td>${tx.employeeName || '—'}</td>
       <td>${tx.reason || '—'}</td>
     </tr>
   `).join('');
@@ -96,23 +96,24 @@ transactionSearch.addEventListener('input', debounce(renderTransactions, 150));
 transactionTypeFilter.addEventListener('change', renderTransactions);
 transactionDateFilter.addEventListener('change', renderTransactions);
 
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-  showAppLoader('Loading transaction history...');
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (!profile || profile.active === false) {
-      try { await signOutUser(); } catch (e) {}
-      window.location.href = './login.html';
+initCoordinator.register('pageData', { required: true, description: 'Transaction history' });
+
+initializeRouteGuard({ allowedRoles: ['OWNER', 'EMPLOYEE'] })
+  .then(async (auth) => {
+    if (!auth) {
+      initCoordinator.cancel('pageData');
       return;
     }
-    await loadTransactions();
-  } catch (err) {
-    console.error('Transactions load error:', err);
-  } finally {
-    hideAppLoader();
-  }
-});
+    try {
+      showAppLoader('Loading transaction history...');
+      await loadTransactions();
+    } catch (err) {
+      console.error('Transactions load error:', err);
+    } finally {
+      initCoordinator.complete('pageData');
+    }
+  })
+  .catch((err) => {
+    console.error('Transactions initialization error:', err);
+    initCoordinator.fail('pageData', err);
+  });

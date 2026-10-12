@@ -1,18 +1,6 @@
-import { getCurrentUser, onAuthStateChanged } from '../auth/auth.js';
-import { getCurrentUserProfile } from '../services/user-service.js';
+import { initializeRouteGuard } from '../auth/route-guard.js';
 
-onAuthStateChanged(async (user) => {
-  if (!user) {
-    window.location.href = './login.html';
-    return;
-  }
-
-  try {
-    const profile = await getCurrentUserProfile(user.uid);
-    if (profile?.role !== 'OWNER') {
-      window.location.href = './dashboard.html';
-    }
-  } catch (error) {
+initializeRouteGuard({ allowedRoles: ['OWNER'] })
+  .catch((error) => {
     console.error('Settings access check failed:', error);
-  }
-});
+  });
