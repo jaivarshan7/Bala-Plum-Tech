@@ -318,10 +318,10 @@ cp .env.example .env
 5. Open your local `.env` file and populate the corresponding values:
 
 ```env
-FIREBASE_API_KEY=AIzaSyA1234567890ExampleKey
-FIREBASE_AUTH_DOMAIN=bala-plum-tech.firebaseapp.com
-FIREBASE_PROJECT_ID=bala-plum-tech
-FIREBASE_STORAGE_BUCKET=bala-plum-tech.appspot.com
+FIREBASE_API_KEY=AIzaSyA1245890ExampleKey
+FIREBASE_AUTH_DOMAIN=bala-plumb-tech.firebaseapp.com
+FIREBASE_PROJECT_ID=bala-plumb-tech
+FIREBASE_STORAGE_BUCKET=bala-plumb-tech.appspot.com
 FIREBASE_MESSAGING_SENDER_ID=123456789012
 FIREBASE_APP_ID=1:123456789012:web:abcdef123456
 FIREBASE_MEASUREMENT_ID=G-ABCDEF1234
