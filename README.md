@@ -38,8 +38,9 @@ This app helps plumbing businesses track inventory, record stock movements, moni
 3. For Google sign-in, configure the authorized domain for your local and production hosts
 4. Create a Firestore database
 5. Copy your Firebase configuration into a local `.env` file using `.env.example` as a guide
-6. Configure Firestore security rules using the provided `firestore.rules` file
-7. Ensure your app loads through a local web server such as VS Code Live Server or a simple static server
+6. Run `node scripts/generate-firebase-config.js` to generate `js/firebase/firebase-config.js` locally (this file is excluded from Git by `.gitignore`)
+7. Configure Firestore security rules using the provided `firestore.rules` file
+8. Ensure your app loads through a local web server such as VS Code Live Server or a simple static server
 
 ## Local Development
 

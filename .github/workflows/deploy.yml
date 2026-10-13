@@ -1,0 +1,65 @@
+name: Deploy to Firebase Hosting
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (generate and validate real config without deploying)'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 1. CI validation for pushes & pull requests (Zero secrets required)
+      - name: Validate Generator & Template (Placeholder Mode)
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: |
+          node scripts/generate-firebase-config.js --placeholder --output js/firebase/firebase-config.test.js
+          node --check js/firebase/firebase-config.test.js
+          node --check js/firebase/firebase-config.example.js
+          rm js/firebase/firebase-config.test.js
+
+      # 2. Generate real configuration from GitHub secrets (Manual dispatch only)
+      - name: Generate Real Firebase Client Configuration
+        if: github.event_name == 'workflow_dispatch'
+        run: node scripts/generate-firebase-config.js
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+
+      # 3. Validate real generated configuration syntax (Manual dispatch only)
+      - name: Validate Real Configuration Syntax
+        if: github.event_name == 'workflow_dispatch'
+        run: node --check js/firebase/firebase-config.js
+
+      # 4. Deploy to Firebase Hosting (Manual dispatch only, when dry_run is false)
+      - name: Deploy to Firebase Hosting (Live Channel)
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run != true && inputs.dry_run != 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BALA_PLUM_TECH }}
+          channelId: live
+          projectId: bala-plum-tech

@@ -1,8 +1,13 @@
 node_modules/
 .env
 .env.*
+!.env.example
 .DS_Store
 coverage/
 .vite
 *.log
 .firebase
+
+# Generated client Firebase configuration (never commit credentials)
+js/firebase/firebase-config.js
+!js/firebase/firebase-config.example.js
